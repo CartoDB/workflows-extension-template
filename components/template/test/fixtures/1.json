@@ -1,8 +1,8 @@
 {
   "output_table": [
     {
-      "name": "Alice",
-      "id": 1,
+      "name": "Bob",
+      "id": 2,
       "fixed_value_col": "test"
     },
     {
@@ -11,8 +11,8 @@
       "fixed_value_col": "test"
     },
     {
-      "name": "Bob",
-      "id": 2,
+      "name": "Alice",
+      "id": 1,
       "fixed_value_col": "test"
     }
   ]

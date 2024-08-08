@@ -8,6 +8,7 @@ import zipfile
 import json
 from uuid import uuid4
 import base64
+import re
 
 WORKFLOWS_TEMP_SCHEMA = "WORKFLOWS_TEMP"
 EXTENSIONS_TABLENAME = "WORKFLOWS_EXTENSIONS"
@@ -156,9 +157,15 @@ def create_sql_code_sf(metadata):
             procedures_code += "\n" + procedure_code
     procedures = []
     for c in metadata["components"]:
-        lines = procedure_code.splitlines()
-        create_line = [l for l in lines if l.startswith("CREATE OR REPLACE PROCEDURE")][0]
-        parameters = create_line.split("(")[1].split(")")[0].split(",")
+        # Extract parameters using regex
+        pattern = r'CREATE OR REPLACE PROCEDURE.*?\(([^()]*?)\)'
+        match = re.search(pattern, procedure_code, re.DOTALL)
+        # Get first group of the match and split by comma
+        parameters = match.group(1).split(',')
+        if len(parameters) == 1 and parameters[0].strip() == '':
+            parameters = []
+        # Remove starting and trailing spaces
+        parameters = [param.strip() for param in parameters]
         param_types = [p.split()[1].upper() for p in parameters]
         procedures.append(f"{c['procedureName']}({','.join(param_types)})")
     code = f'''
@@ -326,6 +333,8 @@ def _get_test_results(metadata, component):
                     param_values.append(tablename)
                 elif inputparam["type"] == "String":
                     param_values.append(f"'{test_configuration['inputs'][inputparam['name']]}'")
+                elif inputparam["type"] == "Selection":
+                    param_values.append(f"'{test_configuration['inputs'][inputparam['name']]}'")
                 else:
                     param_values.append(test_configuration["inputs"][inputparam["name"]])
             for outputparam in component["outputs"]:
@@ -446,9 +455,15 @@ def check():
             procedure_code = f.read()
             assert f"CREATE OR REPLACE PROCEDURE {WORKFLOWS_TEMP_PLACEHOLDER}.{component['procedureName']}" in procedure_code, \
                 f"Procedure '{WORKFLOWS_TEMP_PLACEHOLDER}.{component['procedureName']}' not found in component '{component['name']}'"
-            lines = procedure_code.splitlines()
-            create_line = [l for l in lines if l.startswith("CREATE OR REPLACE PROCEDURE")][0]
-            parameters = create_line.split("(")[1].split(")")[0].split(",")
+            # Extract parameters using regex
+            pattern = r'CREATE OR REPLACE PROCEDURE.*?\(([^()]*?)\)'
+            match = re.search(pattern, procedure_code, re.DOTALL)
+            # Get first group of the match and split by comma
+            parameters = match.group(1).split(',')
+            if len(parameters) == 1 and parameters[0].strip() == '':
+                parameters = []
+            # Remove starting and trailing spaces
+            parameters = [param.strip().lower() for param in parameters]
             parameter_names = [p.split()[0] for p in parameters]
             parameter_types = [p.split()[1].upper() for p in parameters]
             type_function = _param_type_to_bq_type if metadata["provider"] == "bigquery" else _param_type_to_sf_type
@@ -470,12 +485,12 @@ def check():
 parser = argparse.ArgumentParser()
 parser.add_argument('action', nargs=1, type=str, choices=[
                     'package', 'deploy', 'test', 'capture', 'check'])
-parser.add_argument('--component', type=str)
-parser.add_argument('--destination', type=str, required="deploy" in argv)
-parser.add_argument('-v', help='Verbose mode', action='store_true')
+parser.add_argument('-c','--component', help='Choose one component', type=str)
+parser.add_argument('-d','--destination', help='Choose an specific destination', type=str, required="deploy" in argv)
+parser.add_argument('-v','--verbose', help='Verbose mode', action='store_true')
 args = parser.parse_args()
 action = args.action[0]
-verbose = args.v
+verbose = args.verbose
 if args.component and action not in ['capture', 'test']:
     parser.error("Component can only be used with 'capture' and 'test' actions")
 if args.destination and action not in ['deploy']:
