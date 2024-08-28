@@ -1,18 +1,21 @@
 {
   "output_table": [
     {
-      "name": "Carol",
-      "id": 3,
-      "fixed_value_col": "test2"
-    },
-    {
-      "name": "Alice",
-      "id": 1,
-      "fixed_value_col": "test2"
-    },
-    {
-      "name": "Bob",
       "id": 2,
+      "name": "Bob",
+      "geo": "POINT(1 1)",
+      "fixed_value_col": "test2"
+    },
+    {
+      "id": 1,
+      "name": "Alice",
+      "geo": "POINT(1 1)",
+      "fixed_value_col": "test2"
+    },
+    {
+      "id": 3,
+      "name": "Carol",
+      "geo": "POINT(1 1)",
       "fixed_value_col": "test2"
     }
   ]
