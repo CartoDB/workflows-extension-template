@@ -1,14 +1,15 @@
-from google.cloud import bigquery
-import snowflake.connector
 from dotenv import load_dotenv
-import argparse
+from google.cloud import bigquery
 from sys import argv
-import os
-import zipfile
-import json
+from textwrap import dedent, indent
 from uuid import uuid4
+import argparse
 import base64
+import json
+import os
 import re
+import snowflake.connector
+import zipfile
 
 WORKFLOWS_TEMP_SCHEMA = "WORKFLOWS_TEMP"
 EXTENSIONS_TABLENAME = "WORKFLOWS_EXTENSIONS"
@@ -99,125 +100,225 @@ def create_metadata():
     return metadata
 
 
-def create_sql_code_bq(metadata):
-    procedures_code = ""
+env_var_names = [
+    "analyticsToolboxDataset",
+    "analyticsToolboxVersion",
+    "apiBaseUrl",
+    "accessToken",
+    "dataExportDefaultGCSBucket",
+    "bigqueryProjectId",
+    "bigqueryRegion",
+]
+
+
+def get_procedure_code_bq(component):
     current_folder = os.path.dirname(os.path.abspath(__file__))
     components_folder = os.path.join(current_folder, "components")
-    for component in metadata["components"]:
-        procedure_file = os.path.join(
-            components_folder, component["name"], "src", "procedure.sql"
+    fullrun_file = os.path.join(
+        components_folder, component["name"], "src", "fullrun.sql"
+    )
+    with open(fullrun_file, "r") as f:
+        fullrun_code = f.read().replace("\n", "\n" + " " * 16)
+    dryrun_file = os.path.join(
+        components_folder, component["name"], "src", "dryrun.sql"
+    )
+    with open(dryrun_file, "r") as f:
+        dryrun_code = f.read().replace("\n", "\n" + " " * 16)
+
+    newline_and_tab = ",\n" + " " * 12
+    params_string = newline_and_tab.join(
+        [
+            f"{p['name']} {_param_type_to_bq_type(p['type'])[0]}"
+            for p in component["inputs"]
+        ]
+    )
+
+    env_vars = newline_and_tab.join(
+        [
+            f"DECLARE {v} STRING DEFAULT TO_JSON_STRING(__parsed.{v})"
+            for v in env_var_names
+        ]
+    )
+    procedure_code = f"""\
+        CREATE OR REPLACE PROCEDURE {WORKFLOWS_TEMP_PLACEHOLDER}.{component["procedureName"]}(
+            {params_string},
+            dry_run BOOLEAN,
+            env_vars STRING
         )
-        with open(procedure_file, "r") as f:
-            procedure_code = f.read()
-            procedures_code += "\n" + procedure_code
+        BEGIN
+            DECLARE __parsed JSON default PARSE_JSON(env_vars);
+            {env_vars}
+            IF (dry_run) THEN
+                {dryrun_code}
+            ELSE
+                {fullrun_code}
+            END IF;
+        END;
+        """
+    procedure_code = "\n".join(
+        [line for line in procedure_code.split("\n") if line.strip()]
+    )
+    return procedure_code
+
+
+def create_sql_code_bq(metadata):
+    procedures_code = ""
+    for component in metadata["components"]:
+        procedure_code = get_procedure_code_bq(component)
+        procedures_code += "\n" + procedure_code
     procedures = [c["procedureName"] for c in metadata["components"]]
+    metadata_string = json.dumps(metadata).replace("\\n", "\\\\n")
+    code = dedent(
+        f"""\
+        DECLARE procedures STRING;
+        DECLARE proceduresArray ARRAY<STRING>;
+        DECLARE i INT64 DEFAULT 0;
 
-    code = f"""
-DECLARE procedures STRING;
-DECLARE proceduresArray ARRAY<STRING>;
-DECLARE i INT64 DEFAULT 0;
+        CREATE TABLE IF NOT EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (
+            name STRING,
+            metadata STRING,
+            procedures STRING
+        );
 
-CREATE TABLE IF NOT EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (
-    name STRING,
-    metadata STRING,
-    procedures STRING
-);
+        -- remove procedures from previous installations
 
--- remove procedures from previous installations
-
-SET procedures = (
-    SELECT procedures
-    FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
-    WHERE name = '{metadata["name"]}'
-);
-IF (procedures IS NOT NULL) THEN
-    SET proceduresArray = SPLIT(procedures, ',');
-    LOOP
-        SET i = i + 1;
-        IF i > ARRAY_LENGTH(proceduresArray) THEN
-            LEAVE;
+        SET procedures = (
+            SELECT procedures
+            FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
+            WHERE name = '{metadata["name"]}'
+        );
+        IF (procedures IS NOT NULL) THEN
+            SET proceduresArray = SPLIT(procedures, ',');
+            LOOP
+                SET i = i + 1;
+                IF i > ARRAY_LENGTH(proceduresArray) THEN
+                    LEAVE;
+                END IF;
+                EXECUTE IMMEDIATE 'DROP PROCEDURE {WORKFLOWS_TEMP_PLACEHOLDER}.' || proceduresArray[ORDINAL(i)];
+            END LOOP;
         END IF;
-        EXECUTE IMMEDIATE 'DROP PROCEDURE {WORKFLOWS_TEMP_PLACEHOLDER}.' || proceduresArray[ORDINAL(i)];
-    END LOOP;
-END IF;
 
-DELETE FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
-WHERE name = '{metadata["name"]}';
+        DELETE FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
+        WHERE name = '{metadata["name"]}';
 
--- create procedures
-{procedures_code}
+        -- create procedures
+        {procedures_code}
 
--- add to extensions table
+        -- add to extensions table
 
-INSERT INTO {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
-VALUES ('{metadata["name"]}', '''{json.dumps(metadata)}''', '{','.join(procedures)}');
-    """
+        INSERT INTO {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
+        VALUES ('{metadata["name"]}', '''{metadata_string}''', '{','.join(procedures)}');"""
+    )
 
-    return code
+    return dedent(code)
+
+
+def get_procedure_code_sf(component):
+    current_folder = os.path.dirname(os.path.abspath(__file__))
+    components_folder = os.path.join(current_folder, "components")
+    fullrun_file = os.path.join(
+        components_folder, component["name"], "src", "fullrun.sql"
+    )
+    with open(fullrun_file, "r") as f:
+        fullrun_code = f.read().replace("\n", "\n" + " " * 16)
+    dryrun_file = os.path.join(
+        components_folder, component["name"], "src", "dryrun.sql"
+    )
+    with open(dryrun_file, "r") as f:
+        dryrun_code = f.read().replace("\n", "\n" + " " * 16)
+
+    newline_and_tab = ",\n" + " " * 12
+    params_string = newline_and_tab.join(
+        [
+            f"{p['name']} {_param_type_to_sf_type(p['type'])[0]}"
+            for p in component["inputs"]
+        ]
+    )
+
+    env_vars = newline_and_tab.join(
+        [
+            f"DECLARE {v} VARCHAR DEFAULT JSON_EXTRACT_PATH_TEXT(env_vars, '{v}');"
+            for v in env_var_names
+        ]
+    )
+    procedure_code = dedent(
+        f"""\
+        CREATE OR REPLACE PROCEDURE {WORKFLOWS_TEMP_PLACEHOLDER}.{component["procedureName"]}(
+            {params_string},
+            dry_run BOOLEAN,
+            env_vars VARCHAR
+        )
+        RETURNS VARCHAR
+        LANGUAGE SQL
+        AS
+        $$
+        BEGIN
+            {env_vars}
+            JSON_EXTRACT_PATH_TEXT
+            IF (dry_run) THEN
+                {dryrun_code}
+            ELSE
+                {fullrun_code}
+            END IF;
+        END;
+        $$;
+        """
+    )
+
+    procedure_code = "\n".join(
+        [line for line in procedure_code.split("\n") if line.strip()]
+    )
+    return procedure_code
 
 
 def create_sql_code_sf(metadata):
     procedures_code = ""
-    current_folder = os.path.dirname(os.path.abspath(__file__))
-    components_folder = os.path.join(current_folder, "components")
     for component in metadata["components"]:
-        procedure_file = os.path.join(
-            components_folder, component["name"], "src", "procedure.sql"
-        )
-        with open(procedure_file, "r") as f:
-            procedure_code = f.read()
-            procedures_code += "\n" + procedure_code
+        procedure_code = get_procedure_code_sf(component)
+        procedures_code += "\n" + procedure_code
     procedures = []
     for c in metadata["components"]:
-        # Extract parameters using regex
-        pattern = r"CREATE OR REPLACE PROCEDURE.*?\(([^()]*?)\)"
-        match = re.search(pattern, procedure_code, re.DOTALL)
-        # Get first group of the match and split by comma
-        parameters = match.group(1).split(",")
-        if len(parameters) == 1 and parameters[0].strip() == "":
-            parameters = []
-        # Remove starting and trailing spaces
-        parameters = [param.strip() for param in parameters]
-        param_types = [p.split()[1].upper() for p in parameters]
+        param_types = [f"{p['type']}" for p in c["inputs"]]
         procedures.append(f"{c['procedureName']}({','.join(param_types)})")
-    code = f"""
-DECLARE
-    procedures STRING;
-BEGIN
-    CREATE TABLE IF NOT EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (
-        name STRING,
-        metadata STRING,
-        procedures STRING
-    );
+    metadata_string = json.dumps(metadata).replace("\\n", "\\\\n")
+    code = dedent(
+        f"""DECLARE
+            procedures STRING;
+        BEGIN
+            CREATE TABLE IF NOT EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (
+                name STRING,
+                metadata STRING,
+                procedures STRING
+            );
 
-    -- remove procedures from previous installations
+            -- remove procedures from previous installations
 
-    procedures := (
-        SELECT procedures
-        FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
-        WHERE name = '{metadata["name"]}'
-    );
+            procedures := (
+                SELECT procedures
+                FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
+                WHERE name = '{metadata["name"]}'
+            );
 
-    BEGIN
-        EXECUTE IMMEDIATE 'DROP PROCEDURE IF EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.'
-            || REPLACE(:procedures, ';', ';DROP PROCEDURE IF EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.');
-    EXCEPTION
-        WHEN OTHER THEN
-            NULL;
-    END;
+            BEGIN
+                EXECUTE IMMEDIATE 'DROP PROCEDURE IF EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.'
+                    || REPLACE(:procedures, ';', ';DROP PROCEDURE IF EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.');
+            EXCEPTION
+                WHEN OTHER THEN
+                    NULL;
+            END;
 
-    DELETE FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
-    WHERE name = '{metadata["name"]}';
+            DELETE FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
+            WHERE name = '{metadata["name"]}';
 
-    -- create procedures
-    {procedures_code}
+            -- create procedures
+            {procedures_code}
 
-    -- add to extensions table
+            -- add to extensions table
 
-    INSERT INTO {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
-    VALUES ('{metadata["name"]}', '{json.dumps(metadata)}', '{';'.join(procedures)}');
-END;
-"""
+            INSERT INTO {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
+            VALUES ('{metadata["name"]}', '{metadata_string}', '{';'.join(procedures)}');
+        END;"""
+    )
 
     return code
 
@@ -471,7 +572,7 @@ def _param_type_to_bq_type(param_type):
     ]:
         return ["STRING"]
     elif param_type == "Number":
-        return ["INT64", "FLOAT64"]
+        return ["FLOAT64", "INT64"]
     elif param_type == "Boolean":
         return ["BOOL", "BOOLEAN"]
     else:
@@ -498,7 +599,7 @@ def _param_type_to_sf_type(param_type):
     ]:
         return ["STRING", "VARCHAR"]
     elif param_type == "Number":
-        return ["INTEGER", "FLOAT"]
+        return ["FLOAT", "INTEGER"]
     elif param_type == "Boolean":
         return ["BOOL"]
     else:
@@ -512,46 +613,7 @@ def check():
     components_folder = os.path.join(current_folder, "components")
     for component in metadata["components"]:
         component_folder = os.path.join(components_folder, component["name"])
-        procedure_file = os.path.join(component_folder, "src", "procedure.sql")
-        with open(procedure_file, "r") as f:
-            procedure_code = f.read()
-            assert (
-                f"CREATE OR REPLACE PROCEDURE {WORKFLOWS_TEMP_PLACEHOLDER}.{component['procedureName']}"
-                in procedure_code
-            ), f"Procedure '{WORKFLOWS_TEMP_PLACEHOLDER}.{component['procedureName']}' not found in component '{component['name']}'"
-            # Extract parameters using regex
-            pattern = r"CREATE OR REPLACE PROCEDURE.*?\(([^()]*?)\)"
-            match = re.search(pattern, procedure_code, re.DOTALL)
-            # Get first group of the match and split by comma
-            parameters = match.group(1).split(",")
-            if len(parameters) == 1 and parameters[0].strip() == "":
-                parameters = []
-            # Remove starting and trailing spaces
-            parameters = [param.strip().lower() for param in parameters]
-            parameter_names = [p.split()[0] for p in parameters]
-            parameter_types = [p.split()[1].upper() for p in parameters]
-            type_function = (
-                _param_type_to_bq_type
-                if metadata["provider"] == "bigquery"
-                else _param_type_to_sf_type
-            )
-            metadata_parameter_names = (
-                [p["name"] for p in component["inputs"]]
-                + [p["name"] for p in component["outputs"]]
-                + ["dry_run"]
-            )
-            metadata_parameter_types = (
-                [type_function(p["type"]) for p in component["inputs"]]
-                + [type_function(p["type"]) for p in component["outputs"]]
-                + [type_function("Boolean")]
-            )
-            assert (
-                parameter_names == metadata_parameter_names
-            ), f"Parameters in procedure '{WORKFLOWS_TEMP_PLACEHOLDER}.{component['procedureName']}' do not match with metadata in component '{component['name']}'"
-            for i in range(len(parameter_types) - 1):
-                assert (
-                    parameter_types[i] in metadata_parameter_types[i]
-                ), f"Parameter types in procedure '{WORKFLOWS_TEMP_PLACEHOLDER}.{component['procedureName']}' do not match with metadata in component '{component['name']}'"
+
     print("Extension correctly checked. No errors found.")
 
 

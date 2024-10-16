@@ -1,9 +1,11 @@
 ## Build your own extension
+
 ##### A step by step guide
 
 1. Create a new repository from this template. [See the oficial GitHub docs](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
 
 2. Navigate to the repository folder and install the requirements needed by the repository scripts. Python 3 is required to run the repository scripts:
+
     ```bash
     $ pip install -r ./requirements.txt
     ```
@@ -14,7 +16,7 @@
 
 5. Edit the component metadata file in `components/mycomponent/metadata.json`. For a complete reference of the available options, see [this page](./doc/component_metadata.md).
 
-6. Edit the `components/mycomponent/src/procedure.sql` file to define the logic of the new component. For a complete guide, see [here](./doc/procedure.md).
+6. Edit the `components/mycomponent/src/fullrun.sql` and `components/mycomponent/src/dryrun.sql` files to define the logic of the new component. For a complete guide, see [here](./doc/procedure.md).
 
 > 💡 **Tip**
 >
@@ -37,19 +39,22 @@
 >
 > At this point, it is highly recommended that you create and run some tests for your components, so that consistency on the results is easy to check across different versions. Check [this section](./running-tests.md) to learn more about creating and running tests for your components.
 
-11. Use the `deploy` command to create the components in a specific destination in your data warehouse. This is specially useful while developing, as it will avoid having to package and manually install the extension with every change. 
+11. Use the `deploy` command to create the components in a specific destination in your data warehouse. This is specially useful while developing, as it will avoid having to package and manually install the extension with every change.
 
-    > 📍 **IMPORTANT** 
+    > 📍 **IMPORTANT**
     >
-    >Just make sure that your destination matches the Workflows temp. location that is defined for the CARTO connection that you're using with Workflows.
-    > 
-    >By default, this is a `workflows_temp` dataset in your BigQuery billing project or a `WORKFLOWS_TEMP` schema in your Snowflake database.
-    
+    > Just make sure that your destination matches the Workflows temp. location that is defined for the CARTO connection that you're using with Workflows.
+    >
+    > By default, this is a `workflows_temp` dataset in your BigQuery billing project or a `WORKFLOWS_TEMP` schema in your Snowflake database.
+
     **BigQuery**
+
     ```bash
     $ python carto_extension.py deploy --destination=myproject.mydataset
     ```
+
     **Snowflake**
+
     ```bash
     $ python carto_extension.py deploy --destination=MY_DATABASE.MY_SCHEMA
     ```

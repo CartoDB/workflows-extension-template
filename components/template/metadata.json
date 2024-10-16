@@ -16,7 +16,9 @@
             "name": "value",
             "title": "Column value",
             "description": "The value to add to the column",
-            "type": "String"
+            "type": "String",
+            "mode": "multiline",
+            "placeholder": "The value\nto add to the column"
         }
     ],
     "outputs": [
