@@ -544,6 +544,7 @@ def _get_test_results(metadata, component):
                 param_values.append(f"'{tablename}'")
                 tables[outputparam["name"]] = tablename
             param_values.append(False)  # dry run
+            param_values.append(json.dumps(test_configuration.get("env_vars", {})))
             query = f"""CALL {workflows_temp}.{component['procedureName']}(
                 {','.join([str(p) if p is not None else 'null' for p in param_values])}, '{{ }}'
             );"""
