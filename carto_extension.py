@@ -393,23 +393,46 @@ def _upload_test_table_bq(filename, component):
                 schema.append(bigquery.SchemaField(key, value))
     else:
         for key, value in data[0].items():
-            if isinstance(value, int):
-                data_type = "INT64"
-            elif isinstance(value, float):
-                data_type = "FLOAT64"
-            elif key.endswith("date"):
-                data_type = "DATE"
-            elif key.endswith("timestamp"):
-                data_type = "TIMESTAMP"
-            elif key.endswith("datetime"):
-                data_type = "DATETIME"
+            if isinstance(value, dict):
+                sub_schema = []
+                for sub_key, sub_value in value.items():
+                    if isinstance(sub_value, int):
+                        data_type = "INT64"
+                    elif isinstance(sub_value, float):
+                        data_type = "FLOAT64"
+                    elif sub_key.endswith("date"):
+                        data_type = "DATE"
+                    elif sub_key.endswith("timestamp"):
+                        data_type = "TIMESTAMP"
+                    elif sub_key.endswith("datetime"):
+                        data_type = "DATETIME"
+                    else:
+                        try:
+                            wkt.loads(sub_value)
+                            data_type = "GEOGRAPHY"
+                        except Exception as e:
+                            data_type = "STRING"
+                    sub_schema.append(bigquery.SchemaField(sub_key, data_type))
+                
+                schema.append(bigquery.SchemaField(key, "RECORD", fields=sub_schema))
             else:
-                try:
-                    wkt.loads(value)
-                    data_type = "GEOGRAPHY"
-                except Exception as e:
-                    data_type = "STRING"
-            schema.append(bigquery.SchemaField(key, data_type))
+                if isinstance(value, int):
+                    data_type = "INT64"
+                elif isinstance(value, float):
+                    data_type = "FLOAT64"
+                elif key.endswith("date"):
+                    data_type = "DATE"
+                elif key.endswith("timestamp"):
+                    data_type = "TIMESTAMP"
+                elif key.endswith("datetime"):
+                    data_type = "DATETIME"
+                else:
+                    try:
+                        wkt.loads(value)
+                        data_type = "GEOGRAPHY"
+                    except Exception as e:
+                        data_type = "STRING"
+                schema.append(bigquery.SchemaField(key, data_type))
     dataset_id = os.getenv("BQ_TEST_DATASET")
     table_id = f"_test_{component['name']}_{os.path.basename(filename).split('.')[0]}"
 
@@ -544,9 +567,14 @@ def _get_test_results(metadata, component):
                     else:
                         param_values.append(param_value)
             for outputparam in component["outputs"]:
-                tablename = f"{workflows_temp}._table_{uuid4().hex}"
-                param_values.append(f"'{tablename}'")
-                tables[outputparam["name"]] = tablename
+                if outputparam["name"]=='output_table_details':
+                    tablename = f"{tablename}_details"
+                    param_values.append(f"'{tablename}'")
+                    tables[outputparam["name"]] = tablename
+                else:
+                    tablename = f"{workflows_temp}._table_{uuid4().hex}"
+                    param_values.append(f"'{tablename}'")
+                    tables[outputparam["name"]] = tablename
             param_values.append(False)  # dry run
             param_values.append(json.dumps(test_configuration.get("env_vars", "{}")))
             query = f"""CALL {workflows_temp}.{component['procedureName']}(
@@ -605,22 +633,40 @@ def test(component):
 
 
 def normalize_json(original, decimal_places=3):
-    """Ensure that the input for a test is in an uniform format.
+    """Ensure that the input for a test is in a uniform format.
 
     This function takes an input and generates a new version of it that does
-    comply with an uniform format, including the precision of the floats.
+    comply with a uniform format, including the precision of the floats.
     """
-    processed = list()
-    for row in original:
-        processed_row = dict()
-        for column, value in row.items():
+    # If the input is a dictionary, process each key-value pair
+    if isinstance(original, dict):
+        processed_row = {}
+        processed = []
+        for column, value in original.items():
             if isinstance(value, float):
                 processed_row[column] = round(value, decimal_places)
+            elif isinstance(value, dict):
+                processed_row[column] = normalize_json(value, decimal_places)
+            elif isinstance(value, list):
+                processed_row[column] = normalize_json(value, decimal_places)
             else:
                 processed_row[column] = value
-        processed.append(processed_row)
-
-    return processed
+        return processed_row
+    
+    # If the input is a list, process each element
+    elif isinstance(original, list):
+        processed = []
+        for item in original:
+            processed.append(normalize_json(item, decimal_places))
+        return processed
+    
+    # If the input is a single float value, round it
+    elif isinstance(original, float):
+        return round(original, decimal_places)
+    
+    # For all other data types (e.g., int, str), return the value unchanged
+    else:
+        return original
 
 
 def test_output(expected, result, decimal_places=3):
