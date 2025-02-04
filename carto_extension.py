@@ -382,6 +382,27 @@ def substitute_vars(text) -> str:
     return text
 
 
+def _data_type_from_value(value):
+    if isinstance(value, int):
+        return "INT64"
+    elif isinstance(value, float):
+        return "FLOAT64"
+    elif isinstance(value, str):
+        if value.endswith("date"):
+            return "DATE"
+        elif value.endswith("timestamp"):
+            return "TIMESTAMP"
+        elif value.endswith("datetime"):
+            return "DATETIME"
+        else:
+            try:
+                wkt.loads(value)
+                return "GEOGRAPHY"
+            except Exception:
+                return "STRING"
+    return "STRING"
+
+
 def _upload_test_table_bq(filename, component):
     schema = []
     with open(filename) as f:
@@ -396,42 +417,12 @@ def _upload_test_table_bq(filename, component):
             if isinstance(value, dict):
                 sub_schema = []
                 for sub_key, sub_value in value.items():
-                    if isinstance(sub_value, int):
-                        data_type = "INT64"
-                    elif isinstance(sub_value, float):
-                        data_type = "FLOAT64"
-                    elif sub_key.endswith("date"):
-                        data_type = "DATE"
-                    elif sub_key.endswith("timestamp"):
-                        data_type = "TIMESTAMP"
-                    elif sub_key.endswith("datetime"):
-                        data_type = "DATETIME"
-                    else:
-                        try:
-                            wkt.loads(sub_value)
-                            data_type = "GEOGRAPHY"
-                        except Exception as e:
-                            data_type = "STRING"
+                    data_type = _data_type_from_value(sub_value)
                     sub_schema.append(bigquery.SchemaField(sub_key, data_type))
                 
                 schema.append(bigquery.SchemaField(key, "RECORD", fields=sub_schema))
             else:
-                if isinstance(value, int):
-                    data_type = "INT64"
-                elif isinstance(value, float):
-                    data_type = "FLOAT64"
-                elif key.endswith("date"):
-                    data_type = "DATE"
-                elif key.endswith("timestamp"):
-                    data_type = "TIMESTAMP"
-                elif key.endswith("datetime"):
-                    data_type = "DATETIME"
-                else:
-                    try:
-                        wkt.loads(value)
-                        data_type = "GEOGRAPHY"
-                    except Exception as e:
-                        data_type = "STRING"
+                data_type = _data_type_from_value(value)
                 schema.append(bigquery.SchemaField(key, data_type))
     dataset_id = os.getenv("BQ_TEST_DATASET")
     table_id = f"_test_{component['name']}_{os.path.basename(filename).split('.')[0]}"
@@ -566,15 +557,10 @@ def _get_test_results(metadata, component):
                         param_values.append(f"'{param_value}'")
                     else:
                         param_values.append(param_value)
+            tablename = f"{workflows_temp}._table_{uuid4().hex}"
             for outputparam in component["outputs"]:
-                if outputparam["name"]=='output_table_details':
-                    tablename = f"{tablename}_details"
-                    param_values.append(f"'{tablename}'")
-                    tables[outputparam["name"]] = tablename
-                else:
-                    tablename = f"{workflows_temp}._table_{uuid4().hex}"
-                    param_values.append(f"'{tablename}'")
-                    tables[outputparam["name"]] = tablename
+                param_values.append(f"'{tablename}'")
+                tables[outputparam["name"]] = tablename
             param_values.append(False)  # dry run
             param_values.append(json.dumps(test_configuration.get("env_vars", "{}")))
             query = f"""CALL {workflows_temp}.{component['procedureName']}(
@@ -632,7 +618,7 @@ def test(component):
     print("Extension correctly tested.")
 
 
-def normalize_json(original, decimal_places=3):
+def _normalize_json(original, decimal_places=3):
     """Ensure that the input for a test is in a uniform format.
 
     This function takes an input and generates a new version of it that does
@@ -646,9 +632,9 @@ def normalize_json(original, decimal_places=3):
             if isinstance(value, float):
                 processed_row[column] = round(value, decimal_places)
             elif isinstance(value, dict):
-                processed_row[column] = normalize_json(value, decimal_places)
+                processed_row[column] = _normalize_json(value, decimal_places)
             elif isinstance(value, list):
-                processed_row[column] = normalize_json(value, decimal_places)
+                processed_row[column] = _normalize_json(value, decimal_places)
             else:
                 processed_row[column] = value
         return processed_row
@@ -657,7 +643,7 @@ def normalize_json(original, decimal_places=3):
     elif isinstance(original, list):
         processed = []
         for item in original:
-            processed.append(normalize_json(item, decimal_places))
+            processed.append(_normalize_json(item, decimal_places))
         return processed
     
     # If the input is a single float value, round it
@@ -669,12 +655,26 @@ def normalize_json(original, decimal_places=3):
         return original
 
 
+def _sorted_json(data):
+    """Recursively sort JSON-like structures (lists of dicts) to enable consistent ordering."""
+    
+    if isinstance(data, dict):
+        # Sort the dictionary by keys and recursively sort each value
+        return {key: _sorted_json(data[key]) for key in sorted(data)}
+    elif isinstance(data, list):
+        # Recursively sort each item in the list
+        return sorted((_sorted_json(item) for item in data), key=json.dumps)
+    else:
+        # If it's not a dict or list, return it as is (base case of recursion)
+        return data
+
+
 def test_output(expected, result, decimal_places=3):
-    expected = normalize_json(
-        sorted(expected, key=json.dumps), decimal_places=decimal_places
+    expected = _normalize_json(
+        _sorted_json(expected), decimal_places=decimal_places
     )
-    result = normalize_json(
-        sorted(result, key=json.dumps), decimal_places=decimal_places
+    result = _normalize_json(
+        _sorted_json(result), decimal_places=decimal_places
     )
     return expected == result
 
