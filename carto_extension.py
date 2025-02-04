@@ -624,7 +624,6 @@ def _normalize_json(original, decimal_places=3):
     This function takes an input and generates a new version of it that does
     comply with a uniform format, including the precision of the floats.
     """
-    # If the input is a dictionary, process each key-value pair
     if isinstance(original, dict):
         processed_row = {}
         processed = []
@@ -639,18 +638,15 @@ def _normalize_json(original, decimal_places=3):
                 processed_row[column] = value
         return processed_row
     
-    # If the input is a list, process each element
     elif isinstance(original, list):
         processed = []
         for item in original:
             processed.append(_normalize_json(item, decimal_places))
         return processed
     
-    # If the input is a single float value, round it
     elif isinstance(original, float):
         return round(original, decimal_places)
     
-    # For all other data types (e.g., int, str), return the value unchanged
     else:
         return original
 
@@ -659,13 +655,10 @@ def _sorted_json(data):
     """Recursively sort JSON-like structures (lists of dicts) to enable consistent ordering."""
     
     if isinstance(data, dict):
-        # Sort the dictionary by keys and recursively sort each value
         return {key: _sorted_json(data[key]) for key in sorted(data)}
     elif isinstance(data, list):
-        # Recursively sort each item in the list
         return sorted((_sorted_json(item) for item in data), key=json.dumps)
     else:
-        # If it's not a dict or list, return it as is (base case of recursion)
         return data
 
 
