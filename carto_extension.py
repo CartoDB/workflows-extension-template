@@ -100,6 +100,7 @@ def create_metadata():
         fullrun_file = os.path.join(components_folder, component, "src", "fullrun.sql")
         with open(fullrun_file, "r") as f:
             fullrun_code = f.read()
+
         code_hash = (
             int(hashlib.sha256(fullrun_code.encode("utf-8")).hexdigest(), 16) % 10**8
         )
@@ -267,6 +268,7 @@ def get_procedure_code_sf(component):
                 BEGIN
                     -- TODO: remove once the database is set for dry-runs
                     EXECUTE IMMEDIATE \\'USE DATABASE \\' || SPLIT_PART(_workflows_temp, \\'.\\', 0);
+
                 {dryrun_code}
                 END;
             ELSE
@@ -438,6 +440,7 @@ def infer_schema_field_bq(key: str, value: Any) -> bigquery.SchemaField:
         raise NotImplementedError(
             f"Could not infer a BigQuery SchemaField for {value} ({type(value)})"
         )
+
 def _upload_test_table_bq(filename, component):
     schema = []
     with open(filename) as f:
@@ -784,6 +787,7 @@ def capture(component):
                 contents = json.dumps(outputs, indent=2, default=str)
                 contents = substitute_keys(contents, dotenv=dotenv)
                 f.write(contents)
+
     print("Fixtures correctly captured.")
 
 
