@@ -224,13 +224,12 @@ def get_procedure_code_sf(component):
         components_folder, component["name"], "src", "fullrun.sql"
     )
     with open(fullrun_file, "r") as f:
-        fullrun_code = f.read().replace("\n", "\n" + " " * 16)
+        fullrun_code = f.read().replace("\n", "\n" + " " * 16).replace("'", "\\'")
     dryrun_file = os.path.join(
         components_folder, component["name"], "src", "dryrun.sql"
     )
     with open(dryrun_file, "r") as f:
-        dryrun_code = f.read().replace("\n", "\n" + " " * 16)
-
+        dryrun_code = f.read().replace("\n", "\n" + " " * 16).replace("'", "\\'")
     newline_and_tab = ",\n" + " " * 12
     params_string = newline_and_tab.join(
         [
@@ -255,12 +254,16 @@ def get_procedure_code_sf(component):
         )
         RETURNS VARCHAR
         LANGUAGE SQL
-        AS
-        $$
+        EXECUTE AS CALLER
+        AS '
         BEGIN
             {env_vars}
-            IF (dry_run) THEN
+            IF ( :dry_run ) THEN
+                DECLARE
+                    _workflows_temp VARCHAR := \\'@@workflows_temp@@\\';
                 BEGIN
+                    -- TODO: remove once the database is set for dry-runs
+                    EXECUTE IMMEDIATE \\'USE DATABASE \\' || SPLIT_PART(_workflows_temp, \\'.\\', 0);
                 {dryrun_code}
                 END;
             ELSE
@@ -269,7 +272,7 @@ def get_procedure_code_sf(component):
                 END;
             END IF;
         END;
-        $$;
+        ';
         """
     )
 
@@ -288,7 +291,8 @@ def create_sql_code_sf(metadata):
     for c in metadata["components"]:
         param_types = [f"{p['type']}" for p in c["inputs"]]
         procedures.append(f"{c['procedureName']}({','.join(param_types)})")
-    metadata_string = json.dumps(metadata).replace("\\n", "\\\\n")
+    metadata_string = json.dumps(metadata).replace("\\n", "\\\\n").replace("'", "\\'")
+    procedures_string =  ';'.join(procedures).replace("'", "\'")
     code = dedent(
         f"""DECLARE
             procedures STRING;
@@ -324,7 +328,7 @@ def create_sql_code_sf(metadata):
             -- add to extensions table
 
             INSERT INTO {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
-            VALUES ('{metadata["name"]}', '{metadata_string}', '{';'.join(procedures)}');
+            VALUES ('{metadata["name"]}', '{metadata_string}', '{procedures_string}');
         END;"""
     )
 
