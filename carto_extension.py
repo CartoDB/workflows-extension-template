@@ -46,6 +46,8 @@ def sf_client():
                 user=os.getenv("SF_USER"),
                 password=os.getenv("SF_PASSWORD"),
                 account=os.getenv("SF_ACCOUNT"),
+                database=os.getenv("SF_TEST_DATABASE"),
+                schema=os.getenv("SF_TEST_SCHEMA"),
             )
         except Exception as e:
             raise Exception(f"Error connecting to SnowFlake: {e}")
