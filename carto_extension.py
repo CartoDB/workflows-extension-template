@@ -370,20 +370,20 @@ def deploy(destination):
         deploy_sf(metadata, destination)
 
 
-def substitute_vars(text) -> str:
+def substitute_vars(text: str) -> str:
     """Substitute all variables in a string with their values from the environment.
 
-    For a given string, all the variables using the syntax `${variable_name}`
+    For a given string, all the variables using the syntax `%%{variable_name}%%`
     will be interpolated with their values from the corresponding env vars. It will
     raise a ValueError if any variable name is not present in the environment.
     """
-    pattern = r"\${([a-zA-Z0-9_]+)}"
+    pattern = r"%%\{([a-zA-Z0-9_]+)\}%%"
 
     for variable in re.findall(pattern, text, re.MULTILINE):
         env_var_value = os.getenv(variable)
         if env_var_value is None:
             raise ValueError(f"Environment variable {variable} is not set")
-        text = text.replace(f"${{{variable}}}", env_var_value)
+        text = text.replace(f"%%{{{variable}}}%%", env_var_value)
 
     return text
 
@@ -693,6 +693,7 @@ def capture(component):
             test_filename = os.path.join(test_folder, f"{test_id}.json")
             with open(test_filename, "w") as f:
                 f.write(json.dumps(outputs, indent=2, default=str))
+
     print("Fixtures correctly captured.")
 
 
