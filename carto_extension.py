@@ -14,6 +14,9 @@ import snowflake.connector
 import zipfile
 import io
 import urllib.request
+import pandas as pd
+import math
+from typing import Any
 
 WORKFLOWS_TEMP_SCHEMA = "WORKFLOWS_TEMP"
 EXTENSIONS_TABLENAME = "WORKFLOWS_EXTENSIONS"
@@ -388,27 +391,39 @@ def substitute_vars(text: str) -> str:
     return text
 
 
-def _data_type_from_value(value):
+
+def infer_schema_field_bq(key: str, value: Any) -> bigquery.SchemaField:
     if isinstance(value, int):
-        return "INT64"
+        return bigquery.SchemaField(key, "INT64")
     elif isinstance(value, float):
-        return "FLOAT64"
+        return bigquery.SchemaField(key, "FLOAT64")
+
     elif isinstance(value, str):
-        if value.endswith("date"):
-            return "DATE"
-        elif value.endswith("timestamp"):
-            return "TIMESTAMP"
-        elif value.endswith("datetime"):
-            return "DATETIME"
+        if key.endswith("date"):
+            return bigquery.SchemaField(key, "DATE")
+        elif key.endswith("timestamp"):
+            return bigquery.SchemaField(key, "TIMESTAMP")
+        elif key.endswith("datetime"):
+            return bigquery.SchemaField(key, "DATETIME")
         else:
             try:
                 wkt.loads(value)
-                return "GEOGRAPHY"
+                return bigquery.SchemaField(key, "GEOGRAPHY")
             except Exception:
-                return "STRING"
-    return "STRING"
+                return bigquery.SchemaField(key, "STRING")
 
+    elif isinstance(value, dict):
+        sub_schema = [
+            infer_schema_field_bq(sub_key, sub_value)
+            for sub_key, sub_value in value.items()
+        ]
 
+        return bigquery.SchemaField(key, "RECORD", fields=sub_schema)
+
+    else:
+        raise NotImplementedError(
+            f"Could not infer a BigQuery SchemaField for {value} ({type(value)})"
+        )
 def _upload_test_table_bq(filename, component):
     schema = []
     with open(filename) as f:
@@ -420,16 +435,8 @@ def _upload_test_table_bq(filename, component):
                 schema.append(bigquery.SchemaField(key, value))
     else:
         for key, value in data[0].items():
-            if isinstance(value, dict):
-                sub_schema = []
-                for sub_key, sub_value in value.items():
-                    data_type = _data_type_from_value(sub_value)
-                    sub_schema.append(bigquery.SchemaField(sub_key, data_type))
-                
-                schema.append(bigquery.SchemaField(key, "RECORD", fields=sub_schema))
-            else:
-                data_type = _data_type_from_value(value)
-                schema.append(bigquery.SchemaField(key, data_type))
+            schema.append(infer_schema_field_bq(key, value))
+
     dataset_id = os.getenv("BQ_TEST_DATASET")
     table_id = f"_test_{component['name']}_{os.path.basename(filename).split('.')[0]}"
 
@@ -460,6 +467,32 @@ def _upload_test_table_bq(filename, component):
         pass
 
 
+def infer_schema_field_sf(key: str, value: Any) -> bigquery.SchemaField:
+    if isinstance(value, int):
+        return "NUMBER"
+    elif isinstance(value, float):
+        return "FLOAT"
+
+    elif isinstance(value, str):
+        if key.endswith("date"):
+            return "DATE"
+        elif key.endswith("timestamp"):
+            return "TIMESTAMP"
+        elif key.endswith("datetime"):
+            return "DATETIME"
+        else:
+            try:
+                wkt.loads(value)
+                return "GEOGRAPHY"
+            except Exception:
+                return "VARCHAR"
+
+    else:
+        raise NotImplementedError(
+            f"Could not infer a Snowflake SchemaField for {value} ({type(value)})"
+        )
+
+
 def _upload_test_table_sf(filename, component):
     with open(filename) as f:
         data = []
@@ -470,24 +503,11 @@ def _upload_test_table_sf(filename, component):
         with open(filename.replace(".ndjson", ".schema")) as f:
             data_types = json.load(f)
     else:
-        data_types = {}
-        for key, value in data[0].items():
-            if isinstance(value, int):
-                data_types[key] = "NUMBER"
-            elif isinstance(value, str):
-                try:
-                    wkt.loads(value)
-                    data_types[key] = "GEOGRAPHY"
-                except Exception as e:
-                    data_types[key] = "VARCHAR"
-            elif isinstance(value, float):
-                data_types[key] = "FLOAT"
-            else:
-                try:
-                    wkt.loads(value)
-                    data_types[key] = "GEOGRAPHY"
-                except Exception as e:
-                    data_types[key] = "VARCHAR"
+        data_types = {
+            key: infer_schema_field_sf(key, value)
+            for key, value in data[0].items()
+        }
+
     table_id = f"_test_{component['name']}_{os.path.basename(filename).split('.')[0]}"
     create_table_sql = f"CREATE OR REPLACE TABLE {sf_workflows_temp}.{table_id} ("
     for key, value in data[0].items():
