@@ -587,32 +587,50 @@ def _get_test_results(metadata, component):
             for outputparam in component["outputs"]:
                 param_values.append(f"'{tablename}'")
                 tables[outputparam["name"]] = tablename
-            param_values.append(False)  # dry run
-            param_values.append(json.dumps(test_configuration.get("env_vars", "{}")))
-            query = f"""CALL {workflows_temp}.{component['procedureName']}(
-                {','.join([str(p) if p is not None else 'null' for p in param_values])}
-            );"""
-            if verbose:
-                print(query)
-            if metadata["provider"] == "bigquery":
-                query_job = bq_client().query(query)
-                result = query_job.result()
-                for output in component["outputs"]:
-                    query = f"SELECT * FROM {tables[output['name']]}"
-                    query_job = bq_client().query(query)
-                    result = query_job.result()
-                    rows = [{k: v for k, v in row.items()} for row in result]
-                    component_results[test_id][output["name"]] = rows
-            else:
-                cur = sf_client().cursor()
-                cur.execute(query)
-                for output in component["outputs"]:
-                    query = f"SELECT * FROM {tables[output['name']]}"
-                    cur = sf_client().cursor()
-                    cur.execute(query)
-                    rows = cur.fetchall()
-                    component_results[test_id][output["name"]] = rows
+
+            env_vars = json.dumps(test_configuration.get("env_vars", None))
+
+            dry_run_params = param_values.copy() + [True, env_vars]
+            dry_run_query = _build_query(workflows_temp, component["procedureName"], dry_run_params)
+
+            full_run_params = param_values.copy() + [False, env_vars]
+            full_run_query = _build_query(workflows_temp, component["procedureName"], full_run_params)
+
+            # TODO: improve argument passing to _run_query()
+            component_results[test_id]["dry"] = _run_query(dry_run_query, component, metadata["provider"], tables)
+            component_results[test_id]["full"] = _run_query(full_run_query, component, metadata["provider"], tables)
+
         results[component["name"]] = component_results
+
+    return results
+
+def _build_query(workflows_temp, component_name, param_values):
+    return f"""CALL {workflows_temp}.{component_name}(
+        {','.join([str(p) if p is not None else 'null' for p in param_values])}
+    );"""
+
+def _run_query(query: str, component: dict, provider: str, tables: dict) -> dict[str, pd.DataFrame]:
+    results = dict()
+
+    if verbose:
+        print(query)
+    if provider == "bigquery":
+        query_job = bq_client().query(query)
+        result = query_job.result()
+        for output in component["outputs"]:
+            query = f"SELECT * FROM {tables[output['name']]}"
+            query_job = bq_client().query(query)
+            results[output["name"]] = query_job.result().to_dataframe()
+    else:
+        cur = sf_client().cursor()
+        cur.execute(query)
+        for output in component["outputs"]:
+            query = f"SELECT * FROM {tables[output['name']]}"
+            cur = sf_client().cursor()
+            cur.execute(query)
+            # Use .fetch_pandas_all() to include column names
+            results[output["name"]] = cur.fetch_pandas_all()
+
     return results
 
 
@@ -629,72 +647,103 @@ def test(component):
         for test_id, outputs in results[component["name"]].items():
             test_folder = os.path.join(component_folder, "test", "fixtures")
             test_filename = os.path.join(test_folder, f"{test_id}.json")
+
+            zipped_outputs = [
+                (output_name, dry_output, outputs["full"][output_name])
+                for output_name, dry_output in outputs["dry"].items()
+            ]
+
+            # Test that dry and full runs have the same schema
+            for output_name, dry_output, full_output in zipped_outputs:
+                if not check_schema(dry_output, full_output):
+                    raise AssertionError(
+                        f"Dry run and full run schemas do not match "
+                        f"in {component['title']} - {test_id} - {output_name}"
+                    )
+            
             if str(test_id).startswith("skip_"):
                 # Don't compare results, it will only throw an error
                 # if there is an issue when running on BigQuery
                 continue
+
+            # Test that the results match the expected ones
             with open(test_filename, "r") as f:
                 expected = json.loads(substitute_vars(f.read()))
-                for output_name, output in outputs.items():
-                    output = json.loads(json.dumps(output, default=str))
+                for output_name, test_result_df in outputs["full"].items():
+                    output = test_result_df.to_dict(orient="records")
                     if not test_output(expected[output_name], output, decimal_places=3):
                         raise AssertionError(
                             f"Test '{test_id}' failed for component {component['name']} and table {output_name}."
                         )
+
     print("Extension correctly tested.")
 
+def _simplify_types(type_name: str) -> str:
+    """Return a simple version of the type to perform checks.
+    
+    This function ignores the precision of numeric types, which is of no relevance."""
+    # TODO: find a way to get the correct numeric type or fetch from the cloud
+    if type_name.startswith("int"):
+        return "number"
+    elif type_name.startswith("float"):
+        return "number"
+    else:
+        return type_name
 
-def _normalize_json(original, decimal_places=3):
-    """Ensure that the input for a test is in a uniform format.
+def check_schema(dry_result, full_result) -> bool:
+    dry_schema = dry_result.dtypes.astype(str).apply(_simplify_types).to_dict()
+    full_schema = full_result.dtypes.astype(str).apply(_simplify_types).to_dict()
+    return dry_schema == full_schema
+
+def normalize_json(original, decimal_places=3):
+    """Ensure that the input for a test is in an uniform format.
 
     This function takes an input and generates a new version of it that does
-    comply with a uniform format, including the precision of the floats.
+    comply with an uniform format, including the precision of the floats.
     """
-    if isinstance(original, dict):
-        processed_row = {}
-        processed = []
-        for column, value in original.items():
-            if isinstance(value, float):
-                processed_row[column] = round(value, decimal_places)
-            elif isinstance(value, dict):
-                processed_row[column] = _normalize_json(value, decimal_places)
-            elif isinstance(value, list):
-                processed_row[column] = _normalize_json(value, decimal_places)
-            else:
-                processed_row[column] = value
-        return processed_row
-    
-    elif isinstance(original, list):
-        processed = []
-        for item in original:
-            processed.append(_normalize_json(item, decimal_places))
-        return processed
-    
-    elif isinstance(original, float):
-        return round(original, decimal_places)
-    
+    # GOTCHA: dump and load to pass all values through the JSON parser, to
+    # prevent any mismatch in types that cannot be inferred (i.e. Timestamp)
+    original = json.loads(json.dumps(original, default=str))
+
+    processed = list()
+    for row in _sorted_json(original):
+        processed.append(
+            {
+                column: normalize_element(value, decimal_places)
+                for column, value in row.items()
+            }
+        )
+
+    return processed
+
+def normalize_element(value, decimal_places=3):
+    """Format a single scalar value in the desired format."""
+    if isinstance(value, float) and math.isnan(value):
+        return "nan"
+    elif isinstance(value, float):
+        return round(value, decimal_places)
+    elif value is None:
+        return "None"
     else:
-        return original
+        return value
 
 
 def _sorted_json(data):
     """Recursively sort JSON-like structures (lists of dicts) to enable consistent ordering."""
-    
     if isinstance(data, dict):
         return {key: _sorted_json(data[key]) for key in sorted(data)}
     elif isinstance(data, list):
-        return sorted((_sorted_json(item) for item in data), key=json.dumps)
+        return sorted(
+            (_sorted_json(item) for item in data),
+            key=(lambda j: json.dumps(j, default=str))
+        )
     else:
         return data
 
 
 def test_output(expected, result, decimal_places=3):
-    expected = _normalize_json(
-        _sorted_json(expected), decimal_places=decimal_places
-    )
-    result = _normalize_json(
-        _sorted_json(result), decimal_places=decimal_places
-    )
+    expected = normalize_json(_sorted_json(expected), decimal_places=decimal_places)
+    result = normalize_json(_sorted_json(result), decimal_places=decimal_places)
     return expected == result
 
 
@@ -712,8 +761,13 @@ def capture(component):
             os.makedirs(test_folder, exist_ok=True)
             test_filename = os.path.join(test_folder, f"{test_id}.json")
             with open(test_filename, "w") as f:
-                f.write(json.dumps(outputs, indent=2, default=str))
+                outputs = {
+                    output_name: output_results.to_dict(orient="records")
+                    for output_name, output_results in outputs["full"].items()
+                }
 
+                contents = json.dumps(outputs, indent=2, default=str)
+                f.write(contents)
     print("Fixtures correctly captured.")
 
 
