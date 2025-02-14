@@ -391,6 +391,20 @@ def substitute_vars(text: str) -> str:
     return text
 
 
+def substitute_keys(text: str, dotenv: dict[str, str]) -> str:
+    """Substitute all variables in the .env file with their key.
+
+    For a given string, find all occurences of the contents in the .env file and
+    substitute them for their respective keys using the `%%{variable_name}%%`
+    syntax. This function is written to be used when capturing results of tests.
+    """
+    for key, value in dotenv.items():
+        if value in text:
+            print(f"Changing {value} for %%{{{key}}}%% in the captured results...")
+            text = text.replace(value, f"%%{{{key}}}%%")
+
+    return text
+
 
 def infer_schema_field_bq(key: str, value: Any) -> bigquery.SchemaField:
     if isinstance(value, int):
@@ -754,6 +768,7 @@ def capture(component):
     components_folder = os.path.join(current_folder, "components")
     deploy(None)
     results = _get_test_results(metadata, component)
+    dotenv = dotenv_values()
     for component in metadata["components"]:
         component_folder = os.path.join(components_folder, component["name"])
         for test_id, outputs in results[component["name"]].items():
@@ -767,6 +782,7 @@ def capture(component):
                 }
 
                 contents = json.dumps(outputs, indent=2, default=str)
+                contents = substitute_keys(contents, dotenv=dotenv)
                 f.write(contents)
     print("Fixtures correctly captured.")
 
