@@ -696,25 +696,13 @@ def test(component):
 
     print("Extension correctly tested.")
 
-def _simplify_types(type_name: str) -> str:
-    """Return a simple version of the type to perform checks.
-    
-    This function ignores the precision of numeric types, which is of no relevance."""
-    # TODO: find a way to get the correct numeric type or fetch from the cloud
-    if type_name.startswith("int"):
-        return "number"
-    elif type_name.startswith("float"):
-        return "number"
-    else:
-        return type_name
 
 def check_schema(dry_result, full_result) -> bool:
-    dry_schema = dry_result.dtypes.astype(str).apply(_simplify_types).to_dict()
-    full_schema = full_result.dtypes.astype(str).apply(_simplify_types).to_dict()
-
-    # TODO: only comparing column names since types are not being properly fetched
-    # return dry_schema == full_schema
+    """Compare two different DataFrames two have the same columns."""
+    dry_schema = dry_result.dtypes.astype(str).to_dict()
+    full_schema = full_result.dtypes.astype(str).to_dict()
     return dry_schema.keys() == full_schema.keys()
+
 
 def normalize_json(original, decimal_places=3):
     """Ensure that the input for a test is in an uniform format.
