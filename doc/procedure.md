@@ -49,7 +49,10 @@ Do not generate tables with names others than the ones provided in the variables
 
 ## Replacing placeholders with environment variables
 
-You can use placeholders in your code as `${var_name}`. Then you can define the environment variable `var_name` in your system variables or in an `.env` file in the repository folder, and the placeholder will be replaced when packaging or deploying the application.
+You can use placeholders in your code as `@@variable_name@@`. Then you can define the environment variable `var_name` (or `VAR_NAME`) in your system variables or in an `.env` file in the repository folder, and the placeholder will be replaced when testing or deploying the application. This will work in the code, test configurations and test fixtures. This substitution is **not** performed when packaging the application - in that case it is delegated to CARTO on installation (for example, to substitute `@@analytics_toolbox_location@@` accordingly).
+
+When capturing test results, the inverse substitution will be performed so that all values present in the `.env` file will be subtitued with their respectives `@@variable_name` in the fixtures. Please takee into account that, while the aforementioned substitution can use all your environment variables, this reverse-substitution will only automatically apply those variables present in the `.env` file.
+
 
 ## Table names and API execution
 
