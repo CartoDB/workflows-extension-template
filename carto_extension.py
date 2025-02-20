@@ -15,6 +15,7 @@ import zipfile
 import io
 import urllib.request
 import pandas as pd
+import numpy as np
 import math
 from typing import Any
 
@@ -688,13 +689,32 @@ def test(component):
             with open(test_filename, "r") as f:
                 expected = json.loads(substitute_vars(f.read()))
                 for output_name, test_result_df in outputs["full"].items():
-                    output = test_result_df.to_dict(orient="records")
+                    output = dataframe_to_dict(test_result_df)
                     if not test_output(expected[output_name], output, decimal_places=3):
                         raise AssertionError(
                             f"Test '{test_id}' failed for component {component['name']} and table {output_name}."
                         )
 
     print("Extension correctly tested.")
+
+
+def dataframe_to_dict(df: pd.DataFrame) -> dict[str, Any]:
+    """Uniformly convert a pandas DataFrame to a neste structure.
+
+    This function ensures that, once calling `to_dict` on a Python DataFrames,
+    only primitive Python types are stored in it. BigQuery tends to download
+    the of `ARRAY<...>` columns as np.ndarray, which can generate errors when
+    capturing or testing. This functions handles that conversion.
+    """
+    for column, dtype in df.dtypes.to_dict().items():
+        if dtype == 'object':
+            value = df.iloc[0].loc[column]
+            if isinstance(value, np.ndarray):
+                # Convert from numpy to primitive types
+                df[column] = df[column].apply(lambda arr: arr.tolist())
+
+    output = df.to_dict(orient="records")
+    return output
 
 
 def check_schema(dry_result, full_result) -> bool:
