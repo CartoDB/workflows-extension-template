@@ -708,7 +708,11 @@ def dataframe_to_dict(df: pd.DataFrame) -> dict[str, Any]:
     """
     for column, dtype in df.dtypes.to_dict().items():
         if dtype == 'object':
-            value = df.iloc[0].loc[column]
+            try:
+                value = df.iloc[0].loc[column]
+            except IndexError:
+                break
+
             if isinstance(value, np.ndarray):
                 # Convert from numpy to primitive types
                 df[column] = df[column].apply(lambda arr: arr.tolist())
