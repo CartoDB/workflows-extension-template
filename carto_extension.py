@@ -747,7 +747,9 @@ def normalize_json(original, decimal_places=3):
 
 def normalize_element(value, decimal_places=3):
     """Format a single scalar value in the desired format."""
-    if isinstance(value, float) and math.isnan(value):
+    if isinstance(value, dict) or isinstance(value, list):
+        return sorted(map(normalize_element, value))
+    elif isinstance(value, float) and math.isnan(value):
         return "nan"
     elif isinstance(value, float):
         return round(value, decimal_places)
