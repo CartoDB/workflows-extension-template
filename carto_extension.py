@@ -14,6 +14,10 @@ import snowflake.connector
 import zipfile
 import io
 import urllib.request
+import pandas as pd
+import numpy as np
+import math
+from typing import Any
 
 WORKFLOWS_TEMP_SCHEMA = "WORKFLOWS_TEMP"
 EXTENSIONS_TABLENAME = "WORKFLOWS_EXTENSIONS"
@@ -46,6 +50,8 @@ def sf_client():
                 user=os.getenv("SF_USER"),
                 password=os.getenv("SF_PASSWORD"),
                 account=os.getenv("SF_ACCOUNT"),
+                database=os.getenv("SF_TEST_DATABASE"),
+                schema=os.getenv("SF_TEST_SCHEMA"),
             )
         except Exception as e:
             raise Exception(f"Error connecting to SnowFlake: {e}")
@@ -95,6 +101,7 @@ def create_metadata():
         fullrun_file = os.path.join(components_folder, component, "src", "fullrun.sql")
         with open(fullrun_file, "r") as f:
             fullrun_code = f.read()
+
         code_hash = (
             int(hashlib.sha256(fullrun_code.encode("utf-8")).hexdigest(), 16) % 10**8
         )
@@ -222,13 +229,12 @@ def get_procedure_code_sf(component):
         components_folder, component["name"], "src", "fullrun.sql"
     )
     with open(fullrun_file, "r") as f:
-        fullrun_code = f.read().replace("\n", "\n" + " " * 16)
+        fullrun_code = f.read().replace("\n", "\n" + " " * 16).replace("'", "\\'")
     dryrun_file = os.path.join(
         components_folder, component["name"], "src", "dryrun.sql"
     )
     with open(dryrun_file, "r") as f:
-        dryrun_code = f.read().replace("\n", "\n" + " " * 16)
-
+        dryrun_code = f.read().replace("\n", "\n" + " " * 16).replace("'", "\\'")
     newline_and_tab = ",\n" + " " * 12
     params_string = newline_and_tab.join(
         [
@@ -253,12 +259,17 @@ def get_procedure_code_sf(component):
         )
         RETURNS VARCHAR
         LANGUAGE SQL
-        AS
-        $$
+        EXECUTE AS CALLER
+        AS '
         BEGIN
             {env_vars}
-            IF (dry_run) THEN
+            IF ( :dry_run ) THEN
+                DECLARE
+                    _workflows_temp VARCHAR := \\'@@workflows_temp@@\\';
                 BEGIN
+                    -- TODO: remove once the database is set for dry-runs
+                    EXECUTE IMMEDIATE \\'USE DATABASE \\' || SPLIT_PART(_workflows_temp, \\'.\\', 0);
+
                 {dryrun_code}
                 END;
             ELSE
@@ -267,7 +278,7 @@ def get_procedure_code_sf(component):
                 END;
             END IF;
         END;
-        $$;
+        ';
         """
     )
 
@@ -286,7 +297,8 @@ def create_sql_code_sf(metadata):
     for c in metadata["components"]:
         param_types = [f"{p['type']}" for p in c["inputs"]]
         procedures.append(f"{c['procedureName']}({','.join(param_types)})")
-    metadata_string = json.dumps(metadata).replace("\\n", "\\\\n")
+    metadata_string = json.dumps(metadata).replace("\\n", "\\\\n").replace("'", "\\'")
+    procedures_string =  ';'.join(procedures).replace("'", "\'")
     code = dedent(
         f"""DECLARE
             procedures STRING;
@@ -322,7 +334,7 @@ def create_sql_code_sf(metadata):
             -- add to extensions table
 
             INSERT INTO {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
-            VALUES ('{metadata["name"]}', '{metadata_string}', '{';'.join(procedures)}');
+            VALUES ('{metadata["name"]}', '{metadata_string}', '{procedures_string}');
         END;"""
     )
 
@@ -364,44 +376,72 @@ def deploy(destination):
         deploy_sf(metadata, destination)
 
 
-def substitute_vars(text) -> str:
+def substitute_vars(text: str) -> str:
     """Substitute all variables in a string with their values from the environment.
 
-    For a given string, all the variables using the syntax `${variable_name}`
-    will be interpolated with their values from the corresponding env vars. It will
-    raise a ValueError if any variable name is not present in the environment.
+    For a given string, all the variables using the syntax `@@variable_name@@`
+    will be interpolated with their values from the corresponding env vars.
+    It will raise a ValueError if any variable name is not present in the
+    environment.
     """
-    pattern = r"\${([a-zA-Z0-9_]+)}"
+    pattern = r"@@([a-zA-Z0-9_]+)@@"
 
     for variable in re.findall(pattern, text, re.MULTILINE):
-        env_var_value = os.getenv(variable)
+        env_var_value = os.getenv(variable.upper())
         if env_var_value is None:
             raise ValueError(f"Environment variable {variable} is not set")
-        text = text.replace(f"${{{variable}}}", env_var_value)
+        text = text.replace(f"@@{variable}@@", env_var_value)
 
     return text
 
 
-def _data_type_from_value(value):
+def substitute_keys(text: str, dotenv: dict[str, str]) -> str:
+    """Substitute all variables in the .env file with their key.
+
+    For a given string, find all occurences of the contents in the .env file and
+    substitute them for their respective keys using the `@@variable_name@@`
+    syntax. This function is written to be used when capturing results of tests.
+    """
+    for key, value in dotenv.items():
+        if value in text:
+            print(f"Changing {value} for @@{key}@@ in the captured results...")
+            text = text.replace(value, f"@@{key}@@")
+
+    return text
+
+
+def infer_schema_field_bq(key: str, value: Any) -> bigquery.SchemaField:
     if isinstance(value, int):
-        return "INT64"
+        return bigquery.SchemaField(key, "INT64")
     elif isinstance(value, float):
-        return "FLOAT64"
+        return bigquery.SchemaField(key, "FLOAT64")
+
     elif isinstance(value, str):
-        if value.endswith("date"):
-            return "DATE"
-        elif value.endswith("timestamp"):
-            return "TIMESTAMP"
-        elif value.endswith("datetime"):
-            return "DATETIME"
+        if key.endswith("date"):
+            return bigquery.SchemaField(key, "DATE")
+        elif key.endswith("timestamp"):
+            return bigquery.SchemaField(key, "TIMESTAMP")
+        elif key.endswith("datetime"):
+            return bigquery.SchemaField(key, "DATETIME")
         else:
             try:
                 wkt.loads(value)
-                return "GEOGRAPHY"
+                return bigquery.SchemaField(key, "GEOGRAPHY")
             except Exception:
-                return "STRING"
-    return "STRING"
+                return bigquery.SchemaField(key, "STRING")
 
+    elif isinstance(value, dict):
+        sub_schema = [
+            infer_schema_field_bq(sub_key, sub_value)
+            for sub_key, sub_value in value.items()
+        ]
+
+        return bigquery.SchemaField(key, "RECORD", fields=sub_schema)
+
+    else:
+        raise NotImplementedError(
+            f"Could not infer a BigQuery SchemaField for {value} ({type(value)})"
+        )
 
 def _upload_test_table_bq(filename, component):
     schema = []
@@ -414,16 +454,8 @@ def _upload_test_table_bq(filename, component):
                 schema.append(bigquery.SchemaField(key, value))
     else:
         for key, value in data[0].items():
-            if isinstance(value, dict):
-                sub_schema = []
-                for sub_key, sub_value in value.items():
-                    data_type = _data_type_from_value(sub_value)
-                    sub_schema.append(bigquery.SchemaField(sub_key, data_type))
-                
-                schema.append(bigquery.SchemaField(key, "RECORD", fields=sub_schema))
-            else:
-                data_type = _data_type_from_value(value)
-                schema.append(bigquery.SchemaField(key, data_type))
+            schema.append(infer_schema_field_bq(key, value))
+
     dataset_id = os.getenv("BQ_TEST_DATASET")
     table_id = f"_test_{component['name']}_{os.path.basename(filename).split('.')[0]}"
 
@@ -454,6 +486,32 @@ def _upload_test_table_bq(filename, component):
         pass
 
 
+def infer_schema_field_sf(key: str, value: Any) -> bigquery.SchemaField:
+    if isinstance(value, int):
+        return "NUMBER"
+    elif isinstance(value, float):
+        return "FLOAT"
+
+    elif isinstance(value, str):
+        if key.endswith("date"):
+            return "DATE"
+        elif key.endswith("timestamp"):
+            return "TIMESTAMP"
+        elif key.endswith("datetime"):
+            return "DATETIME"
+        else:
+            try:
+                wkt.loads(value)
+                return "GEOGRAPHY"
+            except Exception:
+                return "VARCHAR"
+
+    else:
+        raise NotImplementedError(
+            f"Could not infer a Snowflake SchemaField for {value} ({type(value)})"
+        )
+
+
 def _upload_test_table_sf(filename, component):
     with open(filename) as f:
         data = []
@@ -464,24 +522,11 @@ def _upload_test_table_sf(filename, component):
         with open(filename.replace(".ndjson", ".schema")) as f:
             data_types = json.load(f)
     else:
-        data_types = {}
-        for key, value in data[0].items():
-            if isinstance(value, int):
-                data_types[key] = "NUMBER"
-            elif isinstance(value, str):
-                try:
-                    wkt.loads(value)
-                    data_types[key] = "GEOGRAPHY"
-                except Exception as e:
-                    data_types[key] = "VARCHAR"
-            elif isinstance(value, float):
-                data_types[key] = "FLOAT"
-            else:
-                try:
-                    wkt.loads(value)
-                    data_types[key] = "GEOGRAPHY"
-                except Exception as e:
-                    data_types[key] = "VARCHAR"
+        data_types = {
+            key: infer_schema_field_sf(key, value)
+            for key, value in data[0].items()
+        }
+
     table_id = f"_test_{component['name']}_{os.path.basename(filename).split('.')[0]}"
     create_table_sql = f"CREATE OR REPLACE TABLE {sf_workflows_temp}.{table_id} ("
     for key, value in data[0].items():
@@ -561,32 +606,50 @@ def _get_test_results(metadata, component):
             for outputparam in component["outputs"]:
                 param_values.append(f"'{tablename}'")
                 tables[outputparam["name"]] = tablename
-            param_values.append(False)  # dry run
-            param_values.append(json.dumps(test_configuration.get("env_vars", "{}")))
-            query = f"""CALL {workflows_temp}.{component['procedureName']}(
-                {','.join([str(p) if p is not None else 'null' for p in param_values])}
-            );"""
-            if verbose:
-                print(query)
-            if metadata["provider"] == "bigquery":
-                query_job = bq_client().query(query)
-                result = query_job.result()
-                for output in component["outputs"]:
-                    query = f"SELECT * FROM {tables[output['name']]}"
-                    query_job = bq_client().query(query)
-                    result = query_job.result()
-                    rows = [{k: v for k, v in row.items()} for row in result]
-                    component_results[test_id][output["name"]] = rows
-            else:
-                cur = sf_client().cursor()
-                cur.execute(query)
-                for output in component["outputs"]:
-                    query = f"SELECT * FROM {tables[output['name']]}"
-                    cur = sf_client().cursor()
-                    cur.execute(query)
-                    rows = cur.fetchall()
-                    component_results[test_id][output["name"]] = rows
+
+            env_vars = json.dumps(test_configuration.get("env_vars", None))
+
+            dry_run_params = param_values.copy() + [True, env_vars]
+            dry_run_query = _build_query(workflows_temp, component["procedureName"], dry_run_params)
+
+            full_run_params = param_values.copy() + [False, env_vars]
+            full_run_query = _build_query(workflows_temp, component["procedureName"], full_run_params)
+
+            # TODO: improve argument passing to _run_query()
+            component_results[test_id]["dry"] = _run_query(dry_run_query, component, metadata["provider"], tables)
+            component_results[test_id]["full"] = _run_query(full_run_query, component, metadata["provider"], tables)
+
         results[component["name"]] = component_results
+
+    return results
+
+def _build_query(workflows_temp, component_name, param_values):
+    return f"""CALL {workflows_temp}.{component_name}(
+        {','.join([str(p) if p is not None else 'null' for p in param_values])}
+    );"""
+
+def _run_query(query: str, component: dict, provider: str, tables: dict) -> dict[str, pd.DataFrame]:
+    results = dict()
+
+    if verbose:
+        print(query)
+    if provider == "bigquery":
+        query_job = bq_client().query(query)
+        result = query_job.result()
+        for output in component["outputs"]:
+            query = f"SELECT * FROM {tables[output['name']]}"
+            query_job = bq_client().query(query)
+            results[output["name"]] = query_job.result().to_dataframe()
+    else:
+        cur = sf_client().cursor()
+        cur.execute(query)
+        for output in component["outputs"]:
+            query = f"SELECT * FROM {tables[output['name']]}"
+            cur = sf_client().cursor()
+            cur.execute(query)
+            # Use .fetch_pandas_all() to include column names
+            results[output["name"]] = cur.fetch_pandas_all()
+
     return results
 
 
@@ -603,72 +666,119 @@ def test(component):
         for test_id, outputs in results[component["name"]].items():
             test_folder = os.path.join(component_folder, "test", "fixtures")
             test_filename = os.path.join(test_folder, f"{test_id}.json")
+
+            zipped_outputs = [
+                (output_name, dry_output, outputs["full"][output_name])
+                for output_name, dry_output in outputs["dry"].items()
+            ]
+
+            # Test that dry and full runs have the same schema
+            for output_name, dry_output, full_output in zipped_outputs:
+                if not check_schema(dry_output, full_output):
+                    raise AssertionError(
+                        f"Dry run and full run schemas do not match "
+                        f"in {component['title']} - {test_id} - {output_name}"
+                    )
+            
             if str(test_id).startswith("skip_"):
                 # Don't compare results, it will only throw an error
                 # if there is an issue when running on BigQuery
                 continue
+
+            # Test that the results match the expected ones
             with open(test_filename, "r") as f:
                 expected = json.loads(substitute_vars(f.read()))
-                for output_name, output in outputs.items():
-                    output = json.loads(json.dumps(output, default=str))
+                for output_name, test_result_df in outputs["full"].items():
+                    output = dataframe_to_dict(test_result_df)
                     if not test_output(expected[output_name], output, decimal_places=3):
                         raise AssertionError(
                             f"Test '{test_id}' failed for component {component['name']} and table {output_name}."
                         )
+
     print("Extension correctly tested.")
 
 
-def _normalize_json(original, decimal_places=3):
-    """Ensure that the input for a test is in a uniform format.
+def dataframe_to_dict(df: pd.DataFrame) -> dict[str, Any]:
+    """Uniformly convert a pandas DataFrame to a neste structure.
+
+    This function ensures that, once calling `to_dict` on a Python DataFrames,
+    only primitive Python types are stored in it. BigQuery tends to download
+    the of `ARRAY<...>` columns as np.ndarray, which can generate errors when
+    capturing or testing. This functions handles that conversion.
+    """
+    for column, dtype in df.dtypes.to_dict().items():
+        if dtype == 'object':
+            try:
+                value = df.iloc[0].loc[column]
+            except IndexError:
+                break
+
+            if isinstance(value, np.ndarray):
+                # Convert from numpy to primitive types
+                df[column] = df[column].apply(lambda arr: arr.tolist())
+
+    output = df.to_dict(orient="records")
+    return output
+
+
+def check_schema(dry_result, full_result) -> bool:
+    """Compare two different DataFrames two have the same columns."""
+    dry_schema = dry_result.dtypes.astype(str).to_dict()
+    full_schema = full_result.dtypes.astype(str).to_dict()
+    return dry_schema.keys() == full_schema.keys()
+
+
+def normalize_json(original, decimal_places=3):
+    """Ensure that the input for a test is in an uniform format.
 
     This function takes an input and generates a new version of it that does
-    comply with a uniform format, including the precision of the floats.
+    comply with an uniform format, including the precision of the floats.
     """
-    if isinstance(original, dict):
-        processed_row = {}
-        processed = []
-        for column, value in original.items():
-            if isinstance(value, float):
-                processed_row[column] = round(value, decimal_places)
-            elif isinstance(value, dict):
-                processed_row[column] = _normalize_json(value, decimal_places)
-            elif isinstance(value, list):
-                processed_row[column] = _normalize_json(value, decimal_places)
-            else:
-                processed_row[column] = value
-        return processed_row
-    
-    elif isinstance(original, list):
-        processed = []
-        for item in original:
-            processed.append(_normalize_json(item, decimal_places))
-        return processed
-    
-    elif isinstance(original, float):
-        return round(original, decimal_places)
-    
+    # GOTCHA: dump and load to pass all values through the JSON parser, to
+    # prevent any mismatch in types that cannot be inferred (i.e. Timestamp)
+    original = json.loads(json.dumps(original, default=str))
+
+    processed = list()
+    for row in _sorted_json(original):
+        processed.append(
+            {
+                column: normalize_element(value, decimal_places)
+                for column, value in row.items()
+            }
+        )
+
+    return processed
+
+def normalize_element(value, decimal_places=3):
+    """Format a single scalar value in the desired format."""
+    if isinstance(value, dict) or isinstance(value, list):
+        return sorted(map(normalize_element, value))
+    elif isinstance(value, float) and math.isnan(value):
+        return "nan"
+    elif isinstance(value, float):
+        return round(value, decimal_places)
+    elif value is None:
+        return "None"
     else:
-        return original
+        return value
 
 
 def _sorted_json(data):
     """Recursively sort JSON-like structures (lists of dicts) to enable consistent ordering."""
-    
     if isinstance(data, dict):
         return {key: _sorted_json(data[key]) for key in sorted(data)}
     elif isinstance(data, list):
-        return sorted((_sorted_json(item) for item in data), key=json.dumps)
+        return sorted(
+            (_sorted_json(item) for item in data),
+            key=(lambda j: json.dumps(j, default=str))
+        )
     else:
         return data
 
 
 def test_output(expected, result, decimal_places=3):
-    expected = _normalize_json(
-        _sorted_json(expected), decimal_places=decimal_places
-    )
-    result = _normalize_json(
-        _sorted_json(result), decimal_places=decimal_places
-    )
+    expected = normalize_json(_sorted_json(expected), decimal_places=decimal_places)
+    result = normalize_json(_sorted_json(result), decimal_places=decimal_places)
     return expected == result
 
 
@@ -679,6 +789,7 @@ def capture(component):
     components_folder = os.path.join(current_folder, "components")
     deploy(None)
     results = _get_test_results(metadata, component)
+    dotenv = dotenv_values()
     for component in metadata["components"]:
         component_folder = os.path.join(components_folder, component["name"])
         for test_id, outputs in results[component["name"]].items():
@@ -686,7 +797,15 @@ def capture(component):
             os.makedirs(test_folder, exist_ok=True)
             test_filename = os.path.join(test_folder, f"{test_id}.json")
             with open(test_filename, "w") as f:
-                f.write(json.dumps(outputs, indent=2, default=str))
+                outputs = {
+                    output_name: output_results.to_dict(orient="records")
+                    for output_name, output_results in outputs["full"].items()
+                }
+
+                contents = json.dumps(outputs, indent=2, default=str)
+                contents = substitute_keys(contents, dotenv=dotenv)
+                f.write(contents)
+
     print("Fixtures correctly captured.")
 
 
