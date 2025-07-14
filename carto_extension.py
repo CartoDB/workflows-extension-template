@@ -15,9 +15,8 @@ import zipfile
 import io
 import urllib.request
 
-WORKFLOWS_TEMP_SCHEMA = "WORKFLOWS_TEMP"
 EXTENSIONS_TABLENAME = "WORKFLOWS_EXTENSIONS"
-WORKFLOWS_TEMP_PLACEHOLDER = "@@workflows_temp@@"
+WORKFLOWS_EXTENSIONS_PLACEHOLDER = "@@workflows_extensions@@"
 
 load_dotenv()
 
@@ -138,7 +137,7 @@ def get_procedure_code_bq(component):
         ]
     )
     procedure_code = f"""\
-        CREATE OR REPLACE PROCEDURE {WORKFLOWS_TEMP_PLACEHOLDER}.`{component["procedureName"]}`(
+        CREATE OR REPLACE PROCEDURE {WORKFLOWS_EXTENSIONS_PLACEHOLDER}.`{component["procedureName"]}`(
             {params_string},
             dry_run BOOLEAN,
             env_vars STRING
@@ -176,7 +175,7 @@ def create_sql_code_bq(metadata):
         DECLARE proceduresArray ARRAY<STRING>;
         DECLARE i INT64 DEFAULT 0;
 
-        CREATE TABLE IF NOT EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (
+        CREATE TABLE IF NOT EXISTS {WORKFLOWS_EXTENSIONS_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (
             name STRING,
             metadata STRING,
             procedures STRING
@@ -186,7 +185,7 @@ def create_sql_code_bq(metadata):
 
         SET procedures = (
             SELECT procedures
-            FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
+            FROM {WORKFLOWS_EXTENSIONS_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
             WHERE name = '{metadata["name"]}'
         );
         IF (procedures IS NOT NULL) THEN
@@ -196,11 +195,11 @@ def create_sql_code_bq(metadata):
                 IF i > ARRAY_LENGTH(proceduresArray) THEN
                     LEAVE;
                 END IF;
-                EXECUTE IMMEDIATE 'DROP PROCEDURE {WORKFLOWS_TEMP_PLACEHOLDER}.' || proceduresArray[ORDINAL(i)];
+                EXECUTE IMMEDIATE 'DROP PROCEDURE {WORKFLOWS_EXTENSIONS_PLACEHOLDER}.' || proceduresArray[ORDINAL(i)];
             END LOOP;
         END IF;
 
-        DELETE FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
+        DELETE FROM {WORKFLOWS_EXTENSIONS_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
         WHERE name = '{metadata["name"]}';
 
         -- create procedures
@@ -208,7 +207,7 @@ def create_sql_code_bq(metadata):
 
         -- add to extensions table
 
-        INSERT INTO {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
+        INSERT INTO {WORKFLOWS_EXTENSIONS_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
         VALUES ('{metadata["name"]}', '''{metadata_string}''', '{','.join(procedures)}');"""
     )
 
@@ -246,7 +245,7 @@ def get_procedure_code_sf(component):
     )
     procedure_code = dedent(
         f"""\
-        CREATE OR REPLACE PROCEDURE {WORKFLOWS_TEMP_PLACEHOLDER}.{component["procedureName"]}(
+        CREATE OR REPLACE PROCEDURE {WORKFLOWS_EXTENSIONS_PLACEHOLDER}.{component["procedureName"]}(
             {params_string},
             dry_run BOOLEAN,
             env_vars VARCHAR
@@ -291,7 +290,7 @@ def create_sql_code_sf(metadata):
         f"""DECLARE
             procedures STRING;
         BEGIN
-            CREATE TABLE IF NOT EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (
+            CREATE TABLE IF NOT EXISTS {WORKFLOWS_EXTENSIONS_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (
                 name STRING,
                 metadata STRING,
                 procedures STRING
@@ -301,19 +300,19 @@ def create_sql_code_sf(metadata):
 
             procedures := (
                 SELECT procedures
-                FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
+                FROM {WORKFLOWS_EXTENSIONS_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
                 WHERE name = '{metadata["name"]}'
             );
 
             BEGIN
-                EXECUTE IMMEDIATE 'DROP PROCEDURE IF EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.'
-                    || REPLACE(:procedures, ';', ';DROP PROCEDURE IF EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.');
+                EXECUTE IMMEDIATE 'DROP PROCEDURE IF EXISTS {WORKFLOWS_EXTENSIONS_PLACEHOLDER}.'
+                    || REPLACE(:procedures, ';', ';DROP PROCEDURE IF EXISTS {WORKFLOWS_EXTENSIONS_PLACEHOLDER}.');
             EXCEPTION
                 WHEN OTHER THEN
                     NULL;
             END;
 
-            DELETE FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
+            DELETE FROM {WORKFLOWS_EXTENSIONS_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
             WHERE name = '{metadata["name"]}';
 
             -- create procedures
@@ -321,7 +320,7 @@ def create_sql_code_sf(metadata):
 
             -- add to extensions table
 
-            INSERT INTO {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
+            INSERT INTO {WORKFLOWS_EXTENSIONS_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
             VALUES ('{metadata["name"]}', '{metadata_string}', '{';'.join(procedures)}');
         END;"""
     )
@@ -333,7 +332,7 @@ def deploy_bq(metadata, destination):
     print("Deploying extension to BigQuery...")
     destination = f"`{destination}`" if destination else bq_workflows_temp
     sql_code = create_sql_code_bq(metadata)
-    sql_code = sql_code.replace(WORKFLOWS_TEMP_PLACEHOLDER, destination)
+    sql_code = sql_code.replace(WORKFLOWS_EXTENSIONS_PLACEHOLDER, destination)
     sql_code = substitute_vars(sql_code)
     if verbose:
         print(sql_code)
@@ -346,7 +345,7 @@ def deploy_sf(metadata, destination):
     print("Deploying extension to SnowFlake...")
     destination = destination or sf_workflows_temp
     sql_code = create_sql_code_sf(metadata)
-    sql_code = sql_code.replace(WORKFLOWS_TEMP_PLACEHOLDER, destination)
+    sql_code = sql_code.replace(WORKFLOWS_EXTENSIONS_PLACEHOLDER, destination)
     sql_code = substitute_vars(sql_code)
 
     if verbose:
