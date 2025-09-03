@@ -5,3 +5,4 @@ shapely
 pytest
 tqdm
 pytest-unordered
+toml

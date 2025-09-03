@@ -32,5 +32,9 @@
     ],
     "components": [
         "template"
+    ],
+    "functions": [
+        "example_python",
+        "example_sql"
     ]
 }

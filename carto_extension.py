@@ -23,7 +23,8 @@ import pytest
 from tqdm import tqdm
 import tempfile
 import os
-
+import re
+import toml
 from shapely.geometry import shape, dumps
 
 WORKFLOWS_TEMP_SCHEMA = "WORKFLOWS_TEMP"
@@ -203,6 +204,338 @@ def create_metadata():
     return metadata
 
 
+def discover_functions(functions_dir: Path = Path("functions/")) -> list[dict]:
+    """Discover all function definitions in the functions directory.
+    
+    Returns:
+        List of function metadata dictionaries
+    """
+    if not functions_dir.exists():
+        return []
+    
+    functions = []
+    for function_folder in functions_dir.iterdir():
+        if function_folder.is_dir():
+            metadata_file = function_folder / "metadata.json"
+            if metadata_file.exists():
+                try:
+                    with open(metadata_file, "r") as f:
+                        metadata = json.load(f)
+                    metadata["_path"] = function_folder
+                    functions.append(metadata)
+                except Exception as e:
+                    print(f"Warning: Failed to load metadata for {function_folder.name}: {e}")
+    
+    return functions
+
+def _extract_pep723_metadata(python_code: str) -> dict:
+    """Extract dependencies and Python version from PEP 723 script metadata.
+    
+    Args:
+        python_code: Python source code that MUST contain PEP 723 metadata
+    
+    Returns:
+        Dictionary with 'dependencies' and 'python_version' keys
+    
+    Raises:
+        ValueError: If PEP 723 metadata block is missing
+    """
+    
+    # Look for PEP 723 script metadata block
+    pattern = r'# /// script\n(.*?)\n# ///'
+    match = re.search(pattern, python_code, re.DOTALL)
+    
+    if not match:
+        raise ValueError(
+            "Python function is missing required PEP 723 metadata block. "
+            "Add a comment block at the top of your definition.py file like:\n"
+            "# /// script\n"
+            "# requires-python = \"==3.11\"\n"
+            "# dependencies = [\n"
+            "#   \"numpy\",\n"
+            "# ]\n"
+            "# ///"
+        )
+    
+    try:
+        # Parse the TOML metadata
+        metadata_lines = match.group(1)
+        # Remove leading "# " from each line
+        toml_content = '\n'.join(line[2:] if line.startswith('# ') else line 
+                                for line in metadata_lines.split('\n') 
+                                if line.strip())
+        
+        metadata = toml.loads(toml_content)
+        dependencies = metadata.get('dependencies', [])
+        
+        # Clean up dependency strings (remove version constraints for some cloud providers)
+        cleaned_deps = []
+        for dep in dependencies:
+            # Extract just the package name for basic compatibility
+            # This is a simple approach - more sophisticated parsing could be added
+            package_name = re.split(r'[<>=!]', dep)[0].strip()
+            cleaned_deps.append(package_name)
+        
+        # Extract Python version
+        requires_python = metadata.get('requires-python', '==3.11')
+        python_version = _extract_python_version(requires_python)
+        
+        return {
+            'dependencies': cleaned_deps,
+            'python_version': python_version
+        }
+        
+    except Exception as e:
+        raise ValueError(f"Failed to parse PEP 723 metadata: {e}")
+
+def _extract_python_version(requires_python: str) -> str:
+    """Extract exact Python version from requires-python specification.
+    
+    Args:
+        requires_python: Version specification - MUST use exact version with ==
+    
+    Returns:
+        Python version string like "3.11"
+    
+    Raises:
+        ValueError: If the version specification is not exact (doesn't use ==)
+    """
+    import re
+    
+    # Only accept explicit version with ==
+    exact_match = re.search(r'==(\d+\.\d+(?:\.\d+)?)', requires_python)
+    if exact_match:
+        version = exact_match.group(1)
+        # Return major.minor format
+        parts = version.split('.')
+        return f"{parts[0]}.{parts[1]}"
+    
+    # Reject any other format
+    raise ValueError(
+        f"Python version must be specified with exact version (==). "
+        f"Got: '{requires_python}'. "
+        f"Use format like 'requires-python = \"==3.11\"' or 'requires-python = \"==3.11.5\"'"
+    )
+
+def generate_function_sql_bigquery(function_metadata: dict) -> str:
+    """Generate BigQuery SQL code for a single function.
+    
+    Args:
+        function_metadata: Function metadata dictionary
+    
+    Returns:
+        SQL code to create the BigQuery function
+    """
+    func_name = function_metadata["name"].upper()
+    func_path = function_metadata["_path"]
+    
+    # Build parameter list with BigQuery types
+    params = []
+    for param in function_metadata["parameters"]:
+        param_name = param["name"]
+        param_type = param["type"]
+        # BigQuery uses standard types as-is
+        params.append(f"{param_name} {param_type}")
+    
+    params_str = ",\n    ".join(params)
+    
+    # Get return type (BigQuery uses as-is)
+    return_type = function_metadata["returns"]["type"]
+    
+    # Infer function type from definition file extension
+    sql_definition_file = func_path / "src" / "definition.sql"
+    python_definition_file = func_path / "src" / "definition.py"
+    
+    if sql_definition_file.exists():
+        # SQL function for BigQuery
+        with open(sql_definition_file, "r") as f:
+            sql_body = f.read().strip()
+        
+        return (
+            f"""CREATE OR REPLACE FUNCTION @@workflows_temp@@.`{func_name}`(
+                {params_str}
+            )
+            RETURNS {return_type}
+            AS (
+                {sql_body}
+            );"""
+        )
+    
+    elif python_definition_file.exists():
+        # Python function for BigQuery
+        with open(python_definition_file, "r") as f:
+            python_code = f.read().strip()
+        
+        # Extract packages and Python version from PEP 723 script metadata
+        try:
+            pep723_metadata = _extract_pep723_metadata(python_code)
+            packages = pep723_metadata['dependencies']
+            python_version = pep723_metadata['python_version']
+        except ValueError as e:
+            print(f"Error in function {func_name}: {e}")
+            return ""
+        
+        # BigQuery Python UDF format
+        packages_str = ",".join([f"'{pkg}'" for pkg in packages]) if packages else ""
+        options = []
+        options.append("entry_point='main'")
+        options.append(f"runtime_version='python-{python_version}'")
+        if packages:
+            options.append(f"packages=[{packages_str}]")
+        options_str = ",\n    ".join(options)
+        
+        return (
+            f"""CREATE OR REPLACE FUNCTION @@workflows_temp@@.`{func_name}`(
+                {params_str}
+            )
+            RETURNS {return_type}
+            LANGUAGE python
+            OPTIONS (
+                {options_str}
+            )
+            AS r\"\"\"
+            {python_code}
+            \"\"\";"""
+        )
+    
+    else:
+        print(f"Warning: No definition file found for {func_name} (checked definition.sql and definition.py)")
+        return ""
+
+
+def generate_function_sql_snowflake(function_metadata: dict) -> str:
+    """Generate Snowflake SQL code for a single function.
+    
+    Args:
+        function_metadata: Function metadata dictionary
+    
+    Returns:
+        SQL code to create the Snowflake function
+    """
+    func_name = function_metadata["name"].upper()
+    func_path = function_metadata["_path"]
+    
+    # Known Snowflake data types
+    known_snowflake_types = {
+        "NUMBER", "DECIMAL", "NUMERIC", "INT", "INTEGER", "BIGINT", "SMALLINT", "TINYINT",
+        "FLOAT", "FLOAT4", "FLOAT8", "DOUBLE", "DOUBLE PRECISION", "REAL",
+        "VARCHAR", "CHAR", "CHARACTER", "STRING", "TEXT",
+        "BINARY", "VARBINARY",
+        "BOOLEAN",
+        "DATE", "DATETIME", "TIME", "TIMESTAMP", "TIMESTAMP_LTZ", "TIMESTAMP_NTZ", "TIMESTAMP_TZ",
+        "VARIANT", "OBJECT", "ARRAY",
+        "GEOGRAPHY", "GEOMETRY"
+    }
+    
+    # Build parameter list using original types from metadata
+    params = []
+    for param in function_metadata["parameters"]:
+        param_name = param["name"]
+        param_type = param["type"]
+        
+        # Validate type against known Snowflake types
+        if param_type.upper() not in known_snowflake_types:
+            print(f"Warning: Parameter '{param_name}' uses type '{param_type}' which may not be a valid Snowflake type")
+        
+        params.append(f"{param_name} {param_type}")
+    
+    params_str = ",\n    ".join(params)
+    
+    # Get return type using original type from metadata
+    return_type = function_metadata["returns"]["type"]
+    
+    # Validate return type against known Snowflake types
+    if return_type.upper() not in known_snowflake_types:
+        print(f"Warning: Return type '{return_type}' may not be a valid Snowflake type")
+    
+    # Infer function type from definition file extension
+    sql_definition_file = func_path / "src" / "definition.sql"
+    python_definition_file = func_path / "src" / "definition.py"
+    
+    if sql_definition_file.exists():
+        # SQL function for Snowflake
+        with open(sql_definition_file, "r") as f:
+            sql_body = f.read().strip()
+        
+        return (
+            f"""CREATE OR REPLACE FUNCTION @@workflows_temp@@.{func_name}(
+                {params_str}
+            )
+            RETURNS {return_type}
+            AS
+            $$
+                {sql_body}
+            $$;"""
+        )
+    
+    elif python_definition_file.exists():
+        # Python function for Snowflake
+        with open(python_definition_file, "r") as f:
+            python_code = f.read().strip()
+        
+        # Extract packages and Python version from PEP 723 script metadata
+        try:
+            pep723_metadata = _extract_pep723_metadata(python_code)
+            packages = pep723_metadata['dependencies']
+            python_version = pep723_metadata['python_version']
+        except ValueError as e:
+            print(f"Error in function {func_name}: {e}")
+            return ""
+        
+        # Snowflake Python UDF format
+        packages_str = ",".join([f"'{pkg}'" for pkg in packages]) if packages else ""
+        packages_clause = f"PACKAGES = ({packages_str})" if packages else ""
+        
+        return (
+            f"""CREATE OR REPLACE FUNCTION @@workflows_temp@@.{func_name}(
+                {params_str}
+            )
+            RETURNS {return_type}
+            LANGUAGE PYTHON
+            RUNTIME_VERSION = '{python_version}'
+            {packages_clause}
+            HANDLER = 'main'
+            AS
+            $$
+            {python_code}
+            $$;"""
+        )
+    
+    else:
+        print(f"Warning: No definition file found for {func_name} (checked definition.sql and definition.py)")
+        return ""
+
+def get_functions_code(provider: str = "bigquery") -> str:
+    """Generate code to declare all UDFs for the specified provider.
+    
+    Args:
+        provider: Target provider ('bigquery' or 'snowflake')
+    
+    Returns:
+        SQL code to create all functions
+    """
+    functions = discover_functions()
+    if not functions:
+        return ""
+    
+    function_codes = []
+    for function_metadata in functions:
+        if provider == "bigquery":
+            func_code = generate_function_sql_bigquery(function_metadata)
+        elif provider == "snowflake":
+            func_code = generate_function_sql_snowflake(function_metadata)
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
+        
+        if func_code:
+            function_codes.append(func_code)
+    
+    if function_codes:
+        return "\n\n".join(function_codes)
+    else:
+        return ""
+
+
 def get_procedure_code_bq(component):
     current_folder = os.path.dirname(os.path.abspath(__file__))
     components_folder = os.path.join(current_folder, "components")
@@ -259,11 +592,16 @@ def get_procedure_code_bq(component):
 
 
 def create_sql_code_bq(metadata):
+    functions_code = ""
+    if metadata.get("functions"):
+        functions_code = get_functions_code("bigquery")
+
     procedures_code = ""
     for component in metadata["components"]:
         procedure_code = get_procedure_code_bq(component)
         procedures_code += "\n" + procedure_code
     procedures = [c["procedureName"] for c in metadata["components"]]
+
     metadata_string = json.dumps(metadata).replace("\\n", "\\\\n")
     code = dedent(
         f"""\
@@ -297,6 +635,9 @@ def create_sql_code_bq(metadata):
 
         DELETE FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
         WHERE name = '{metadata["name"]}';
+
+        -- create functions
+        {functions_code}
 
         -- create procedures
         {procedures_code}
@@ -377,6 +718,10 @@ def get_procedure_code_sf(component):
 
 
 def create_sql_code_sf(metadata):
+    functions_code = ""
+    if metadata.get("functions"):
+        functions_code = get_functions_code("snowflake")
+
     procedures_code = ""
     for component in metadata["components"]:
         procedure_code = get_procedure_code_sf(component)
@@ -415,6 +760,9 @@ def create_sql_code_sf(metadata):
 
             DELETE FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
             WHERE name = '{metadata["name"]}';
+
+            -- create functions
+            {functions_code}
 
             -- create procedures
             {procedures_code}
