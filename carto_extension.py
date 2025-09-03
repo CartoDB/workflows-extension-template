@@ -25,7 +25,8 @@ import tempfile
 import os
 import re
 import toml
-from shapely.geometry import shape, dumps
+from shapely.geometry import shape
+from shapely.wkt import dumps
 
 WORKFLOWS_TEMP_SCHEMA = "WORKFLOWS_TEMP"
 EXTENSIONS_TABLENAME = "WORKFLOWS_EXTENSIONS"
@@ -229,13 +230,13 @@ def discover_functions(functions_dir: Path = Path("functions/")) -> list[dict]:
     return functions
 
 def _extract_pep723_metadata(python_code: str) -> dict:
-    """Extract dependencies and Python version from PEP 723 script metadata.
+    """Extract dependencies and Python version from PEP 723 script metadata and return clean function body.
     
     Args:
         python_code: Python source code that MUST contain PEP 723 metadata
     
     Returns:
-        Dictionary with 'dependencies' and 'python_version' keys
+        Dictionary with 'dependencies', 'python_version', and 'clean_python_body' keys
     
     Raises:
         ValueError: If PEP 723 metadata block is missing
@@ -268,21 +269,19 @@ def _extract_pep723_metadata(python_code: str) -> dict:
         metadata = toml.loads(toml_content)
         dependencies = metadata.get('dependencies', [])
         
-        # Clean up dependency strings (remove version constraints for some cloud providers)
-        cleaned_deps = []
-        for dep in dependencies:
-            # Extract just the package name for basic compatibility
-            # This is a simple approach - more sophisticated parsing could be added
-            package_name = re.split(r'[<>=!]', dep)[0].strip()
-            cleaned_deps.append(package_name)
         
         # Extract Python version
         requires_python = metadata.get('requires-python', '==3.11')
         python_version = _extract_python_version(requires_python)
         
+        # Remove PEP 723 metadata block from function body
+        pep723_pattern = r'# /// script\n.*?\n# ///\n*'
+        clean_python_body = re.sub(pep723_pattern, '', python_code, flags=re.DOTALL).strip()
+        
         return {
-            'dependencies': cleaned_deps,
-            'python_version': python_version
+            'dependencies': dependencies,
+            'python_version': python_version,
+            'clean_python_body': clean_python_body
         }
         
     except Exception as e:
@@ -366,11 +365,12 @@ def generate_function_sql_bigquery(function_metadata: dict) -> str:
         with open(python_definition_file, "r") as f:
             python_code = f.read().strip()
         
-        # Extract packages and Python version from PEP 723 script metadata
+        # Extract packages, Python version, and clean body from PEP 723 script metadata
         try:
             pep723_metadata = _extract_pep723_metadata(python_code)
             packages = pep723_metadata['dependencies']
             python_version = pep723_metadata['python_version']
+            clean_python_code = pep723_metadata['clean_python_body']
         except ValueError as e:
             print(f"Error in function {func_name}: {e}")
             return ""
@@ -393,9 +393,8 @@ def generate_function_sql_bigquery(function_metadata: dict) -> str:
             OPTIONS (
                 {options_str}
             )
-            AS r\"\"\"
-            {python_code}
-            \"\"\";"""
+            AS r\"\"\"\n{clean_python_code}\n\"\"\";
+            """
         )
     
     else:
@@ -473,11 +472,12 @@ def generate_function_sql_snowflake(function_metadata: dict) -> str:
         with open(python_definition_file, "r") as f:
             python_code = f.read().strip()
         
-        # Extract packages and Python version from PEP 723 script metadata
+        # Extract packages, Python version, and clean body from PEP 723 script metadata
         try:
             pep723_metadata = _extract_pep723_metadata(python_code)
             packages = pep723_metadata['dependencies']
             python_version = pep723_metadata['python_version']
+            clean_python_code = pep723_metadata['clean_python_body']
         except ValueError as e:
             print(f"Error in function {func_name}: {e}")
             return ""
@@ -496,9 +496,8 @@ def generate_function_sql_snowflake(function_metadata: dict) -> str:
             {packages_clause}
             HANDLER = 'main'
             AS
-            $$
-            {python_code}
-            $$;"""
+            $$\n{clean_python_code}\n$$;
+            """
         )
     
     else:
