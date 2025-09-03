@@ -2,3 +2,6 @@ google-cloud-bigquery
 snowflake-connector-python
 python-dotenv
 shapely
+pytest
+tqdm
+pytest-unordered
