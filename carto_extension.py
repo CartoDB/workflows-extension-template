@@ -73,7 +73,7 @@ class GeometryComparator:
     @classmethod
     def from_geography_string(cls, value: str) -> "GeometryComparator":
         """Create GeometryComparator from WKT or GeoJSON string.
-        
+
         Tries WKT first, then GeoJSON, raises error otherwise.
         """
         try:
@@ -1442,7 +1442,7 @@ def test_extension_components(test_case):
             assert result_normalized == unordered(expected_normalized)
 
 
-def dataframe_to_dict(df: pd.DataFrame) -> dict[str, Any]:
+def dataframe_to_dict(df: pd.DataFrame) -> list[dict[str, Any]]:
     """Uniformly convert a pandas DataFrame to a neste structure.
 
     This function ensures that, once calling `to_dict` on a Python DataFrames,
@@ -1461,7 +1461,11 @@ def dataframe_to_dict(df: pd.DataFrame) -> dict[str, Any]:
                 # Convert from numpy to primitive types
                 df[column] = df[column].apply(lambda arr: arr.tolist())
 
-    output = df.to_dict(orient="records")
+    output = [
+        {str(column): value for column, value in row.items()}
+        for row in df.to_dict(orient="records")
+    ]
+
     return output
 
 
