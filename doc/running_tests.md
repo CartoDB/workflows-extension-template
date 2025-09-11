@@ -139,8 +139,61 @@ From that point, you can now run the `test` script to run tests and check if the
 $ python carto_extension.py test
 ```
 
-## CI configuration
+## Testing Functions
+
+User Defined Functions (UDFs) can be tested using the same framework as components. For detailed information about testing UDFs, see the [UDF documentation](./user_defined_functions.md#testing-functions).
+
+### Function Test Structure
+
+Function tests are stored in `functions/<function_name>/test/` with:
+- `test.json`: Test cases with function parameters
+- `fixtures/`: Expected results for each test case
+
+### Running Function Tests
+
+```bash
+# Test all functions
+$ python carto_extension.py test
+
+# Test specific function
+$ python carto_extension.py test --function=my_function
+
+# Capture function test results
+$ python carto_extension.py capture --function=my_function
+```
+
+## Pytest Integration
+
+The testing framework now uses pytest internally for improved test management:
+
+- **Automatic Test Discovery**: Tests are automatically discovered and executed
+- **Detailed Reporting**: Enhanced test output with clear pass/fail indicators
+- **Parallel Execution**: Tests can run in parallel when possible
+- **Advanced Assertions**: Better comparison of complex data types including geometry
+
+### Pytest Features
+
+- **Progress Tracking**: Visual progress bars in local development
+- **CI Optimization**: Verbose output automatically enabled in CI environments
+- **Flexible Comparisons**: Order-independent testing for arrays and objects
+- **Precision Control**: Configurable decimal precision for floating-point comparisons
+
+## CI Configuration
 
 This template includes a GitHub workflow to run the extension test suite when new changes are pushed to the repository (provided that the `capture` script has been run and test fixtures have been captured).
 
-GitHub secrets must be configured in order to have the workflow correctly running. Check the [`.github/.workflow/CI_tests.yml`](../.github/.workflow/CI_tests.yml) file for more information.
+GitHub secrets must be configured in order to have the workflow correctly running. Check the [`.github/workflows/test.yml`](../.github/workflows/test.yml) file for more information.
+
+### Required Secrets
+
+For BigQuery testing:
+- `BQ_TEST_PROJECT`: BigQuery project for testing
+- `BQ_TEST_DATASET`: BigQuery dataset for testing
+- `GOOGLE_CREDENTIALS`: Service account credentials JSON
+
+For Snowflake testing:
+- `SF_ACCOUNT`: Snowflake account identifier
+- `SF_TEST_DATABASE`: Snowflake database for testing
+- `SF_TEST_SCHEMA`: Snowflake schema for testing
+- `SF_USER`: Snowflake username
+- `SF_PASSWORD`: Snowflake password
