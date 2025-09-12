@@ -916,10 +916,11 @@ def deploy_sf(metadata, destination):
 
 def deploy(destination):
     metadata = create_metadata()
+    
     if metadata["provider"] == "bigquery":
-        deploy_bq(metadata, destination)
+        deploy_bq(metadata, destination or bq_workflows_temp)
     else:
-        deploy_sf(metadata, destination)
+        deploy_sf(metadata, destination or sf_workflows_temp)
 
 
 def substitute_vars(text: str) -> str:
@@ -1927,7 +1928,7 @@ parser.add_argument(
     "--destination",
     help="Choose an specific destination",
     type=str,
-    required="deploy" in argv,
+    required=False,
 )
 parser.add_argument("-v", "--verbose", help="Verbose mode", action="store_true")
 parser.add_argument(
