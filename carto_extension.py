@@ -1359,6 +1359,10 @@ def test(component, no_deploy=False):
 
     # Set environment variable so pytest can find the data file
     os.environ["PYTEST_TEST_DATA_FILE"] = temp_file_path
+    
+    # Set component filter for pytest
+    if component:
+        os.environ["PYTEST_COMPONENT_FILTER"] = component
 
     try:
         # Step 2: Start pytest session
@@ -1398,6 +1402,8 @@ def test(component, no_deploy=False):
             os.unlink(temp_file_path)
         if "PYTEST_TEST_DATA_FILE" in os.environ:
             del os.environ["PYTEST_TEST_DATA_FILE"]
+        if "PYTEST_COMPONENT_FILTER" in os.environ:
+            del os.environ["PYTEST_COMPONENT_FILTER"]
 
 
 def _build_pytest_args_from_user_flags():
@@ -1444,14 +1450,16 @@ def prepare_test_data(component=None, no_deploy=False):
     if not no_deploy:
         deploy(None)
 
-    # Calculate total number of tests to run for progress bar
-    total_tests = 0
+    # Filter components first, then calculate total number of tests for progress bar
+    components_to_test = _metadata_cache["components"]
+    if component:
+        components_to_test = [c for c in _metadata_cache["components"] if c["name"] == component]
+    
     current_folder = os.path.dirname(os.path.abspath(__file__))
     components_folder = os.path.join(current_folder, "components")
-
-    for comp in _metadata_cache["components"]:
-        if component and comp["name"] != component:
-            continue
+    
+    total_tests = 0
+    for comp in components_to_test:
         component_folder = os.path.join(components_folder, comp["name"])
         test_configuration_file = os.path.join(component_folder, "test", "test.json")
         with open(test_configuration_file, "r") as f:
@@ -1479,6 +1487,8 @@ def load_test_cases():
     """Generate test cases from pre-collected data."""
     # Load test data from file if available
     test_data_file = os.environ.get("PYTEST_TEST_DATA_FILE")
+    component_filter = os.environ.get("PYTEST_COMPONENT_FILTER")
+    
     if test_data_file and os.path.exists(test_data_file):
         with open(test_data_file, "rb") as f:
             data = pickle.load(f)
@@ -1497,6 +1507,9 @@ def load_test_cases():
     components_folder = os.path.join(current_folder, "components")
 
     for component in metadata_cache["components"]:
+        # Apply component filter if specified
+        if component_filter and component["name"] != component_filter:
+            continue
         component_folder = os.path.join(components_folder, component["name"])
 
         # Load test configuration to get test_sorting parameter
@@ -1722,11 +1735,13 @@ def capture(component):
     components_folder = os.path.join(current_folder, "components")
     deploy(None)
 
-    # Calculate total number of tests to run for progress bar
+    # Filter components first, then calculate total number of tests for progress bar
+    components_to_test = metadata["components"]
+    if component:
+        components_to_test = [c for c in metadata["components"] if c["name"] == component]
+    
     total_tests = 0
-    for comp in metadata["components"]:
-        if component and comp["name"] != component:
-            continue
+    for comp in components_to_test:
         component_folder = os.path.join(components_folder, comp["name"])
         test_configuration_file = os.path.join(component_folder, "test", "test.json")
         with open(test_configuration_file, "r") as f:
@@ -1740,7 +1755,9 @@ def capture(component):
     else:
         results = _get_test_results(metadata, component)
     dotenv = dotenv_values()
-    for component in metadata["components"]:
+    
+    # Reuse the same filtered component list for results processing
+    for component in components_to_test:
         component_folder = os.path.join(components_folder, component["name"])
 
         # Load test configuration to get test_sorting parameter
