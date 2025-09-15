@@ -35,6 +35,7 @@
     ],
     "functions": [
         "example_python",
-        "example_sql"
+        "example_sql",
+        "example_procedure"
     ]
 }

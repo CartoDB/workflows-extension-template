@@ -334,16 +334,17 @@ def _extract_python_version(requires_python: str) -> str:
 
 
 def generate_function_sql_bigquery(function_metadata: dict) -> str:
-    """Generate BigQuery SQL code for a single function.
+    """Generate BigQuery SQL code for a single function or procedure.
 
     Args:
         function_metadata: Function metadata dictionary
 
     Returns:
-        SQL code to create the BigQuery function
+        SQL code to create the BigQuery function or procedure
     """
     func_name = function_metadata["name"].upper()
     func_path = function_metadata["_path"]
+    func_type = function_metadata.get("type", "function")
 
     # Build parameter list with BigQuery types
     params = []
@@ -363,11 +364,22 @@ def generate_function_sql_bigquery(function_metadata: dict) -> str:
     python_definition_file = func_path / "src" / "definition.py"
 
     if sql_definition_file.exists():
-        # SQL function for BigQuery
+        # SQL function or procedure for BigQuery
         with open(sql_definition_file, "r") as f:
             sql_body = f.read().strip()
 
-        return f"""CREATE OR REPLACE FUNCTION @@workflows_temp@@.`{func_name}`(
+        if func_type == "procedure":
+            # Create a stored procedure
+            return f"""CREATE OR REPLACE PROCEDURE @@workflows_temp@@.`{func_name}`(
+                {params_str}
+            )
+            OPTIONS (
+                description="{function_metadata.get('description', '')}"
+            )
+            {sql_body}"""
+        else:
+            # Create a function (default behavior)
+            return f"""CREATE OR REPLACE FUNCTION @@workflows_temp@@.`{func_name}`(
                 {params_str}
             )
             RETURNS {return_type}
@@ -376,6 +388,13 @@ def generate_function_sql_bigquery(function_metadata: dict) -> str:
             );"""
 
     elif python_definition_file.exists():
+        # Check if this is a procedure - BigQuery doesn't support Python procedures
+        if func_type == "procedure":
+            raise NotImplementedError(
+                f"BigQuery Python procedures are not supported. "
+                f"Function '{func_name}' is marked as type 'procedure' but uses Python definition."
+            )
+        
         # Python function for BigQuery
         with open(python_definition_file, "r") as f:
             python_code = f.read().strip()
@@ -432,16 +451,17 @@ def generate_function_sql_bigquery(function_metadata: dict) -> str:
 
 
 def generate_function_sql_snowflake(function_metadata: dict) -> str:
-    """Generate Snowflake SQL code for a single function.
+    """Generate Snowflake SQL code for a single function or procedure.
 
     Args:
         function_metadata: Function metadata dictionary
 
     Returns:
-        SQL code to create the Snowflake function
+        SQL code to create the Snowflake function or procedure
     """
     func_name = function_metadata["name"].upper()
     func_path = function_metadata["_path"]
+    func_type = function_metadata.get("type", "function")
 
     # Known Snowflake data types
     known_snowflake_types = {
@@ -509,11 +529,25 @@ def generate_function_sql_snowflake(function_metadata: dict) -> str:
     python_definition_file = func_path / "src" / "definition.py"
 
     if sql_definition_file.exists():
-        # SQL function for Snowflake
+        # SQL function or procedure for Snowflake
         with open(sql_definition_file, "r") as f:
             sql_body = f.read().strip()
 
-        return f"""CREATE OR REPLACE FUNCTION @@workflows_temp@@.{func_name}(
+        if func_type == "procedure":
+            # Create a stored procedure
+            return f"""CREATE OR REPLACE PROCEDURE @@workflows_temp@@.{func_name}(
+                {params_str}
+            )
+            RETURNS {return_type}
+            LANGUAGE SQL
+            EXECUTE AS CALLER
+            AS
+            $$
+                {sql_body}
+            $$;"""
+        else:
+            # Create a function (default behavior)
+            return f"""CREATE OR REPLACE FUNCTION @@workflows_temp@@.{func_name}(
                 {params_str}
             )
             RETURNS {return_type}
@@ -523,7 +557,7 @@ def generate_function_sql_snowflake(function_metadata: dict) -> str:
             $$;"""
 
     elif python_definition_file.exists():
-        # Python function for Snowflake
+        # Python function or procedure for Snowflake
         with open(python_definition_file, "r") as f:
             python_code = f.read().strip()
 
@@ -537,7 +571,7 @@ def generate_function_sql_snowflake(function_metadata: dict) -> str:
             print(f"Error in function {func_name}: {e}")
             return ""
 
-        # Snowflake Python UDF format
+        # Snowflake Python UDF/stored procedure format
         packages_str = ",".join([f"'{pkg}'" for pkg in packages]) if packages else ""
         packages_clause = f"PACKAGES = ({packages_str})" if packages else ""
 
@@ -560,7 +594,22 @@ def generate_function_sql_snowflake(function_metadata: dict) -> str:
             f"\n            {extra_options_str}" if extra_options_clauses else ""
         )
 
-        return f"""CREATE OR REPLACE FUNCTION @@workflows_temp@@.{func_name}(
+        if func_type == "procedure":
+            # Create a Python stored procedure
+            return f"""CREATE OR REPLACE PROCEDURE @@workflows_temp@@.{func_name}(
+                {params_str}
+            )
+            RETURNS {return_type}
+            LANGUAGE PYTHON
+            RUNTIME_VERSION = '{python_version}'
+            {packages_clause}{extra_options_line}
+            HANDLER = 'main'
+            AS
+            $$\n{clean_python_code}\n$$;
+            """
+        else:
+            # Create a Python function (default behavior)
+            return f"""CREATE OR REPLACE FUNCTION @@workflows_temp@@.{func_name}(
                 {params_str}
             )
             RETURNS {return_type}
@@ -670,9 +719,15 @@ def create_sql_code_bq(metadata):
     function_names = []
     if metadata.get("functions"):
         functions_code = get_functions_code("bigquery")
-        # Get function names for tracking
+        # Get function names for tracking with appropriate prefixes
         functions = discover_functions()
-        function_names = [f"`{func['name'].upper()}`" for func in functions]
+        function_names = []
+        for func in functions:
+            func_type = func.get("type", "function")
+            if func_type == "procedure":
+                function_names.append(f"__stproc_{func['name'].upper()}")
+            else:
+                function_names.append(f"__func_{func['name'].upper()}")
 
     procedures_code = ""
     for component in metadata["components"]:
@@ -707,10 +762,13 @@ def create_sql_code_bq(metadata):
                 IF i > ARRAY_LENGTH(proceduresArray) THEN
                     LEAVE;
                 END IF;
-                -- Check if this is a function (marked with __func_ prefix)
+                -- Check if this is custom function or procedure based on prefix
                 IF STARTS_WITH(proceduresArray[ORDINAL(i)], '__func_') THEN
                     EXECUTE IMMEDIATE 'DROP FUNCTION IF EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.' || SUBSTR(proceduresArray[ORDINAL(i)], 8);
+                ELSEIF STARTS_WITH(proceduresArray[ORDINAL(i)], '__stproc_') THEN
+                    EXECUTE IMMEDIATE 'DROP PROCEDURE IF EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.' || SUBSTR(proceduresArray[ORDINAL(i)], 10);
                 ELSE
+                    -- Components (no prefix) 
                     EXECUTE IMMEDIATE 'DROP PROCEDURE IF EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.' || proceduresArray[ORDINAL(i)];
                 END IF;
             END LOOP;
@@ -728,7 +786,7 @@ def create_sql_code_bq(metadata):
         -- add to extensions table
 
         INSERT INTO {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
-        VALUES ('{metadata["name"]}', '''{metadata_string}''', '{','.join(procedures + [f"__func_{name}" for name in function_names])}');"""
+        VALUES ('{metadata["name"]}', '''{metadata_string}''', '{','.join(procedures + function_names)}');"""
     )
 
     return dedent(code)
@@ -805,9 +863,15 @@ def create_sql_code_sf(metadata):
     function_names = []
     if metadata.get("functions"):
         functions_code = get_functions_code("snowflake")
-        # Get function names for tracking
+        # Get function names for tracking with appropriate prefixes
         functions = discover_functions()
-        function_names = [func["name"].upper() for func in functions]
+        function_names = []
+        for func in functions:
+            func_type = func.get("type", "function")
+            if func_type == "procedure":
+                function_names.append(f"__stproc_{func['name'].upper()}")
+            else:
+                function_names.append(f"__func_{func['name'].upper()}")
 
     procedures_code = ""
     for component in metadata["components"]:
@@ -847,7 +911,7 @@ def create_sql_code_sf(metadata):
                     proc_array := SPLIT(procedures, ';');
                     WHILE (i < ARRAY_SIZE(proc_array)) DO
                         proc_item := proc_array[i];
-                        -- Check if this is a function (marked with __func_ prefix)
+                        -- Check if this is a function or procedure based on prefix
                         IF (STARTSWITH(proc_item, '__func_')) THEN
                             BEGIN
                                 EXECUTE IMMEDIATE 'DROP FUNCTION IF EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.' || SUBSTR(proc_item, 8);
@@ -855,7 +919,15 @@ def create_sql_code_sf(metadata):
                                 WHEN OTHER THEN
                                     NULL;
                             END;
+                        ELSEIF (STARTSWITH(proc_item, '__stproc_')) THEN
+                            BEGIN
+                                EXECUTE IMMEDIATE 'DROP PROCEDURE IF EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.' || SUBSTR(proc_item, 10);
+                            EXCEPTION
+                                WHEN OTHER THEN
+                                    NULL;
+                            END;
                         ELSE
+                            -- Legacy behavior for components (no prefix)
                             BEGIN
                                 EXECUTE IMMEDIATE 'DROP PROCEDURE IF EXISTS {WORKFLOWS_TEMP_PLACEHOLDER}.' || proc_item;
                             EXCEPTION
@@ -880,7 +952,7 @@ def create_sql_code_sf(metadata):
             -- add to extensions table
 
             INSERT INTO {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
-            VALUES ('{metadata["name"]}', '{metadata_string}', '{procedures_string};{";".join([f"__func_{name}" for name in function_names]) if function_names else ""}');
+            VALUES ('{metadata["name"]}', '{metadata_string}', '{procedures_string};{";".join(function_names) if function_names else ""}');
         END;"""
     )
 

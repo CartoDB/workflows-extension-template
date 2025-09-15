@@ -1,5 +1,6 @@
 {
   "name": "example_python",
+  "type": "function",
   "description": "Example Python function that calculates distance between two points",
   "parameters": [
     {
