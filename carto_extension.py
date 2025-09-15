@@ -13,7 +13,7 @@ import zipfile
 from pathlib import Path
 from sys import argv
 from textwrap import dedent
-from typing import Any
+from typing import Any, Optional
 from uuid import uuid4
 
 import numpy as np
@@ -216,14 +216,23 @@ def create_metadata():
     return metadata
 
 
-def discover_functions(functions_dir: Path = Path("functions/")) -> list[dict]:
+def discover_functions(functions_dir: Path = Path("functions/"), extension_metadata: Optional[dict] = None) -> list[dict]:
     """Discover all function definitions in the functions directory.
 
+    Args:
+        functions_dir: Directory containing function definitions
+        extension_metadata: Extension metadata to validate functions against
+
     Returns:
-        List of function metadata dictionaries
+        List of function metadata dictionaries for functions listed in extension metadata
     """
     if not functions_dir.exists():
         return []
+
+    # Get the list of allowed function names from extension metadata
+    allowed_functions = set()
+    if extension_metadata and extension_metadata.get("functions"):
+        allowed_functions = set(extension_metadata["functions"])
 
     functions = []
     for function_folder in functions_dir.iterdir():
@@ -233,12 +242,31 @@ def discover_functions(functions_dir: Path = Path("functions/")) -> list[dict]:
                 try:
                     with open(metadata_file, "r") as f:
                         metadata = json.load(f)
+                    
+                    function_name = metadata.get("name")
+                    if not function_name:
+                        print(f"Warning: Function in {function_folder.name} has no name in metadata")
+                        continue
+                    
+                    # Only include functions that are listed in extension metadata
+                    if allowed_functions and function_name not in allowed_functions:
+                        if verbose:
+                            print(f"Skipping function '{function_name}' - not listed in extension metadata")
+                        continue
+                    
                     metadata["_path"] = function_folder
                     functions.append(metadata)
                 except Exception as e:
                     print(
                         f"Warning: Failed to load metadata for {function_folder.name}: {e}"
                     )
+
+    # Warn about functions listed in metadata but not found in directory
+    if allowed_functions:
+        discovered_function_names = {f["name"] for f in functions}
+        missing_functions = allowed_functions - discovered_function_names
+        for missing_func in missing_functions:
+            print(f"Warning: Function '{missing_func}' is listed in extension metadata but not found in functions/ directory")
 
     return functions
 
@@ -628,16 +656,17 @@ def generate_function_sql_snowflake(function_metadata: dict) -> str:
         return ""
 
 
-def get_functions_code(provider: str = "bigquery") -> str:
+def get_functions_code(provider: str = "bigquery", extension_metadata: Optional[dict] = None) -> str:
     """Generate code to declare all UDFs for the specified provider.
 
     Args:
         provider: Target provider ('bigquery' or 'snowflake')
+        extension_metadata: Extension metadata to validate functions against
 
     Returns:
         SQL code to create all functions
     """
-    functions = discover_functions()
+    functions = discover_functions(extension_metadata=extension_metadata)
     if not functions:
         return ""
 
@@ -718,9 +747,9 @@ def create_sql_code_bq(metadata):
     functions_code = ""
     function_names = []
     if metadata.get("functions"):
-        functions_code = get_functions_code("bigquery")
+        functions_code = get_functions_code("bigquery", extension_metadata=metadata)
         # Get function names for tracking with appropriate prefixes
-        functions = discover_functions()
+        functions = discover_functions(extension_metadata=metadata)
         function_names = []
         for func in functions:
             func_type = func.get("type", "function")
@@ -862,9 +891,9 @@ def create_sql_code_sf(metadata):
     functions_code = ""
     function_names = []
     if metadata.get("functions"):
-        functions_code = get_functions_code("snowflake")
+        functions_code = get_functions_code("snowflake", extension_metadata=metadata)
         # Get function names for tracking with appropriate prefixes
-        functions = discover_functions()
+        functions = discover_functions(extension_metadata=metadata)
         function_names = []
         for func in functions:
             func_type = func.get("type", "function")
