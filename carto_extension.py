@@ -397,6 +397,7 @@ def generate_function_sql_bigquery(function_metadata: dict) -> str:
     # Infer function type from definition file extension
     sql_definition_file = func_path / "src" / "definition.sql"
     python_definition_file = func_path / "src" / "definition.py"
+    javascript_definition_file = func_path / "src" / "definition.js"
 
     if sql_definition_file.exists():
         # SQL function or procedure for BigQuery
@@ -423,11 +424,12 @@ def generate_function_sql_bigquery(function_metadata: dict) -> str:
             );"""
 
     elif python_definition_file.exists():
-        # Check if this is a procedure - BigQuery doesn't support Python procedures
+        # Check if this is a procedure - BigQuery doesn't support Python stored procedures
         if func_type == "procedure":
             raise NotImplementedError(
-                f"BigQuery Python procedures are not supported. "
-                f"Function '{func_name}' is marked as type 'procedure' but uses Python definition."
+                f"BigQuery Python stored procedures are not supported. "
+                f"Function '{func_name}' is marked as type 'procedure' but uses Python definition. "
+                f"BigQuery only supports Python UDFs, not stored procedures."
             )
 
         # Python function for BigQuery
@@ -478,9 +480,55 @@ def generate_function_sql_bigquery(function_metadata: dict) -> str:
             AS r\"\"\"\n{clean_python_code}\n\"\"\";
             """
 
+    elif javascript_definition_file.exists():
+        # Check if this is a procedure - BigQuery doesn't support JavaScript stored procedures
+        if func_type == "procedure":
+            raise NotImplementedError(
+                f"BigQuery JavaScript stored procedures are not supported. "
+                f"Function '{func_name}' is marked as type 'procedure' but uses JavaScript definition. "
+                f"BigQuery only supports JavaScript UDFs, not stored procedures."
+            )
+
+        # JavaScript UDF for BigQuery
+        with open(javascript_definition_file, "r") as f:
+            javascript_code = f.read().strip()
+
+        # Add extra options from metadata if present
+        options = []
+        extra_options = function_metadata.get("extra_options", {})
+        for key, value in extra_options.items():
+            if isinstance(value, str):
+                options.append(f"{key}='{value}'")
+            elif isinstance(value, list):
+                # Handle list values like libraries
+                list_str = ",".join([f"'{item}'" for item in value])
+                options.append(f"{key}=[{list_str}]")
+            else:
+                # Handle other types (numbers, booleans)
+                options.append(f"{key}={value}")
+
+        options_str = ",\n    ".join(options) if options else ""
+        if options_str:
+            options_clause = ("\n" + ' ' * 12).join([
+                "",
+                "OPTIONS (",
+                "   " + options_str,
+                ")",
+            ])
+        else:
+            options_clause = ""
+
+        return f"""CREATE OR REPLACE FUNCTION @@workflows_temp@@.`{func_name}`(
+                {params_str}
+            )
+            RETURNS {return_type}
+            LANGUAGE js{options_clause}
+            AS r\"\"\"\n{javascript_code}\n\"\"\";
+            """
+
     else:
         print(
-            f"Warning: No definition file found for {func_name} (checked definition.sql and definition.py)"
+            f"Warning: No definition file found for {func_name} (checked definition.sql, definition.py, and definition.js)"
         )
         return ""
 
@@ -562,6 +610,7 @@ def generate_function_sql_snowflake(function_metadata: dict) -> str:
     # Infer function type from definition file extension
     sql_definition_file = func_path / "src" / "definition.sql"
     python_definition_file = func_path / "src" / "definition.py"
+    javascript_definition_file = func_path / "src" / "definition.js"
 
     if sql_definition_file.exists():
         # SQL function or procedure for Snowflake
@@ -656,9 +705,40 @@ def generate_function_sql_snowflake(function_metadata: dict) -> str:
             $$\n{clean_python_code}\n$$;
             """
 
+    elif javascript_definition_file.exists():
+        # JavaScript function or procedure for Snowflake
+        with open(javascript_definition_file, "r") as f:
+            javascript_code = f.read().strip()
+
+        if func_type == "procedure":
+            # Create a JavaScript stored procedure
+            return f"""CREATE OR REPLACE PROCEDURE @@workflows_temp@@.{func_name}(
+                {params_str}
+            )
+            RETURNS {return_type}
+            LANGUAGE JAVASCRIPT
+            EXECUTE AS CALLER
+            AS
+            $$
+                {javascript_code}
+            $$;
+            """
+        else:
+            # Create a JavaScript function (default behavior)
+            return f"""CREATE OR REPLACE FUNCTION @@workflows_temp@@.{func_name}(
+                {params_str}
+            )
+            RETURNS {return_type}
+            LANGUAGE JAVASCRIPT
+            AS
+            $$
+                {javascript_code}
+            $$;
+            """
+
     else:
         print(
-            f"Warning: No definition file found for {func_name} (checked definition.sql and definition.py)"
+            f"Warning: No definition file found for {func_name} (checked definition.sql, definition.py, and definition.js)"
         )
         return ""
 

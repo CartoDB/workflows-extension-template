@@ -36,6 +36,7 @@
     "functions": [
         "example_python",
         "example_sql",
-        "example_procedure"
+        "example_procedure",
+        "example_javascript"
     ]
 }
