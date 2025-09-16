@@ -993,7 +993,7 @@ def deploy_bq(metadata, destination):
     destination = f"`{destination}`" if destination else bq_workflows_temp
     sql_code = create_sql_code_bq(metadata)
     sql_code = sql_code.replace(WORKFLOWS_TEMP_PLACEHOLDER, destination)
-    sql_code = substitute_vars(sql_code)
+    sql_code = substitute_vars(sql_code, provider="bigquery")
     if verbose:
         print(sql_code)
     query_job = bq_client().query(sql_code)
@@ -1006,7 +1006,7 @@ def deploy_sf(metadata, destination):
     destination = destination or sf_workflows_temp
     sql_code = create_sql_code_sf(metadata)
     sql_code = sql_code.replace(WORKFLOWS_TEMP_PLACEHOLDER, destination)
-    sql_code = substitute_vars(sql_code)
+    sql_code = substitute_vars(sql_code, provider="snowflake")
 
     if verbose:
         print(sql_code)
@@ -1024,14 +1024,24 @@ def deploy(destination):
         deploy_sf(metadata, destination or sf_workflows_temp)
 
 
-def substitute_vars(text: str) -> str:
+def substitute_vars(text: str, provider: Optional[str] = None) -> str:
     """Substitute all variables in a string with their values from the environment.
 
     For a given string, all the variables using the syntax `@@variable_name@@`
     will be interpolated with their values from the corresponding env vars.
     It will raise a ValueError if any variable name is not present in the
     environment.
+    
+    Args:
+        text: The text to substitute variables in
+        provider: The provider type ('bigquery' or 'snowflake') to auto-infer workflows_temp
     """
+    # Set workflows_temp if not already set
+    if not os.getenv('WORKFLOWS_TEMP') and provider == "bigquery":
+        os.environ['WORKFLOWS_TEMP'] = bq_workflows_temp.strip('`')
+    elif not os.getenv('WORKFLOWS_TEMP') and provider == "snowflake":
+        os.environ['WORKFLOWS_TEMP'] = sf_workflows_temp
+    
     pattern = r"@@([a-zA-Z0-9_]+)@@"
 
     for variable in re.findall(pattern, text, re.MULTILINE):
