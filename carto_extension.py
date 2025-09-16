@@ -509,12 +509,14 @@ def generate_function_sql_bigquery(function_metadata: dict) -> str:
 
         options_str = ",\n    ".join(options) if options else ""
         if options_str:
-            options_clause = ("\n" + ' ' * 12).join([
-                "",
-                "OPTIONS (",
-                "   " + options_str,
-                ")",
-            ])
+            options_clause = ("\n" + " " * 12).join(
+                [
+                    "",
+                    "OPTIONS (",
+                    "   " + options_str,
+                    ")",
+                ]
+            )
         else:
             options_clause = ""
 
@@ -1081,9 +1083,9 @@ def deploy_bq(metadata, destination):
     print("Deploying extension to BigQuery...")
     if not destination:
         destination = bq_workflows_temp
-    elif not (destination.startswith('`') and destination.endswith('`')):
+    elif not (destination.startswith("`") and destination.endswith("`")):
         destination = f"`{destination}`"
-    
+
     sql_code = create_sql_code_bq(metadata)
     sql_code = sql_code.replace(WORKFLOWS_TEMP_PLACEHOLDER, destination)
     sql_code = substitute_vars(sql_code, provider="bigquery")
@@ -1218,9 +1220,11 @@ def _upload_test_table_bq(filename, component):
     dataset_id = os.getenv("BQ_TEST_DATASET")
     if component.get("_is_setup_table", False):
         # For setup tables, use direct naming
-        table_id = component['name']
+        table_id = component["name"]
     else:
-        table_id = f"_test_{component['name']}_{os.path.basename(filename).split('.')[0]}"
+        table_id = (
+            f"_test_{component['name']}_{os.path.basename(filename).split('.')[0]}"
+        )
 
     dataset_ref = bq_client().dataset(dataset_id)
     table_ref = dataset_ref.table(table_id)
@@ -1298,9 +1302,11 @@ def _upload_test_table_sf(filename, component):
 
     if component.get("_is_setup_table", False):
         # For setup tables, use direct naming
-        table_id = component['name']
+        table_id = component["name"]
     else:
-        table_id = f"_test_{component['name']}_{os.path.basename(filename).split('.')[0]}"
+        table_id = (
+            f"_test_{component['name']}_{os.path.basename(filename).split('.')[0]}"
+        )
     create_table_sql = f"CREATE OR REPLACE TABLE {sf_workflows_temp}.{table_id} ("
     for key, value in data[0].items():
         create_table_sql += f"{key} {data_types[key]}, "
@@ -1418,7 +1424,7 @@ def _get_test_results(metadata, component, progress_bar=None, use_ci_logging=Fal
                     # Indicate this is a setup table with explicit naming
                     setup_component = {"name": table_name, "_is_setup_table": True}
                     upload_function(ndjson_full_path, setup_component)
-            
+
             param_values = []
             test_id = test_configuration["id"]
             skip_outputs = test_configuration.get("skip_output", [])
@@ -1807,7 +1813,7 @@ def pytest_generate_tests(metafunc):
 def test_extension_components(test_case):
     """Parametrized test function that runs all component tests."""
     from pytest_unordered import unordered
-    
+
     if test_case["test_type"] == "schema":
         # Test schema consistency
         for output_name, dry_output in test_case["outputs"]["dry"].items():
