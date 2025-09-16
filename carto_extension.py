@@ -216,7 +216,9 @@ def create_metadata():
     return metadata
 
 
-def discover_functions(functions_dir: Path = Path("functions/"), extension_metadata: Optional[dict] = None) -> list[dict]:
+def discover_functions(
+    functions_dir: Path = Path("functions/"), extension_metadata: Optional[dict] = None
+) -> list[dict]:
     """Discover all function definitions in the functions directory.
 
     Args:
@@ -242,18 +244,22 @@ def discover_functions(functions_dir: Path = Path("functions/"), extension_metad
                 try:
                     with open(metadata_file, "r") as f:
                         metadata = json.load(f)
-                    
+
                     function_name = metadata.get("name")
                     if not function_name:
-                        print(f"Warning: Function in {function_folder.name} has no name in metadata")
+                        print(
+                            f"Warning: Function in {function_folder.name} has no name in metadata"
+                        )
                         continue
-                    
+
                     # Only include functions that are listed in extension metadata
                     if allowed_functions and function_name not in allowed_functions:
                         if verbose:
-                            print(f"Skipping function '{function_name}' - not listed in extension metadata")
+                            print(
+                                f"Skipping function '{function_name}' - not listed in extension metadata"
+                            )
                         continue
-                    
+
                     metadata["_path"] = function_folder
                     functions.append(metadata)
                 except Exception as e:
@@ -266,7 +272,9 @@ def discover_functions(functions_dir: Path = Path("functions/"), extension_metad
         discovered_function_names = {f["name"] for f in functions}
         missing_functions = allowed_functions - discovered_function_names
         for missing_func in missing_functions:
-            print(f"Warning: Function '{missing_func}' is listed in extension metadata but not found in functions/ directory")
+            print(
+                f"Warning: Function '{missing_func}' is listed in extension metadata but not found in functions/ directory"
+            )
 
     return functions
 
@@ -422,7 +430,7 @@ def generate_function_sql_bigquery(function_metadata: dict) -> str:
                 f"BigQuery Python procedures are not supported. "
                 f"Function '{func_name}' is marked as type 'procedure' but uses Python definition."
             )
-        
+
         # Python function for BigQuery
         with open(python_definition_file, "r") as f:
             python_code = f.read().strip()
@@ -656,7 +664,9 @@ def generate_function_sql_snowflake(function_metadata: dict) -> str:
         return ""
 
 
-def get_functions_code(provider: str = "bigquery", extension_metadata: Optional[dict] = None) -> str:
+def get_functions_code(
+    provider: str = "bigquery", extension_metadata: Optional[dict] = None
+) -> str:
     """Generate code to declare all UDFs for the specified provider.
 
     Args:
@@ -1017,7 +1027,7 @@ def deploy_sf(metadata, destination):
 
 def deploy(destination):
     metadata = create_metadata()
-    
+
     if metadata["provider"] == "bigquery":
         deploy_bq(metadata, destination or bq_workflows_temp)
     else:
@@ -1031,17 +1041,17 @@ def substitute_vars(text: str, provider: Optional[str] = None) -> str:
     will be interpolated with their values from the corresponding env vars.
     It will raise a ValueError if any variable name is not present in the
     environment.
-    
+
     Args:
         text: The text to substitute variables in
         provider: The provider type ('bigquery' or 'snowflake') to auto-infer workflows_temp
     """
     # Set workflows_temp if not already set
-    if not os.getenv('WORKFLOWS_TEMP') and provider == "bigquery":
-        os.environ['WORKFLOWS_TEMP'] = bq_workflows_temp.strip('`')
-    elif not os.getenv('WORKFLOWS_TEMP') and provider == "snowflake":
-        os.environ['WORKFLOWS_TEMP'] = sf_workflows_temp
-    
+    if not os.getenv("WORKFLOWS_TEMP") and provider == "bigquery":
+        os.environ["WORKFLOWS_TEMP"] = bq_workflows_temp.strip("`")
+    elif not os.getenv("WORKFLOWS_TEMP") and provider == "snowflake":
+        os.environ["WORKFLOWS_TEMP"] = sf_workflows_temp
+
     pattern = r"@@([a-zA-Z0-9_]+)@@"
 
     for variable in re.findall(pattern, text, re.MULTILINE):
@@ -1470,7 +1480,7 @@ def test(component, no_deploy=False):
 
     # Set environment variable so pytest can find the data file
     os.environ["PYTEST_TEST_DATA_FILE"] = temp_file_path
-    
+
     # Set component filter for pytest
     if component:
         os.environ["PYTEST_COMPONENT_FILTER"] = component
@@ -1564,11 +1574,13 @@ def prepare_test_data(component=None, no_deploy=False):
     # Filter components first, then calculate total number of tests for progress bar
     components_to_test = _metadata_cache["components"]
     if component:
-        components_to_test = [c for c in _metadata_cache["components"] if c["name"] == component]
-    
+        components_to_test = [
+            c for c in _metadata_cache["components"] if c["name"] == component
+        ]
+
     current_folder = os.path.dirname(os.path.abspath(__file__))
     components_folder = os.path.join(current_folder, "components")
-    
+
     total_tests = 0
     for comp in components_to_test:
         component_folder = os.path.join(components_folder, comp["name"])
@@ -1599,7 +1611,7 @@ def load_test_cases():
     # Load test data from file if available
     test_data_file = os.environ.get("PYTEST_TEST_DATA_FILE")
     component_filter = os.environ.get("PYTEST_COMPONENT_FILTER")
-    
+
     if test_data_file and os.path.exists(test_data_file):
         with open(test_data_file, "rb") as f:
             data = pickle.load(f)
@@ -1849,8 +1861,10 @@ def capture(component):
     # Filter components first, then calculate total number of tests for progress bar
     components_to_test = metadata["components"]
     if component:
-        components_to_test = [c for c in metadata["components"] if c["name"] == component]
-    
+        components_to_test = [
+            c for c in metadata["components"] if c["name"] == component
+        ]
+
     total_tests = 0
     for comp in components_to_test:
         component_folder = os.path.join(components_folder, comp["name"])
@@ -1866,7 +1880,7 @@ def capture(component):
     else:
         results = _get_test_results(metadata, component)
     dotenv = dotenv_values()
-    
+
     # Reuse the same filtered component list for results processing
     for component in components_to_test:
         component_folder = os.path.join(components_folder, component["name"])
