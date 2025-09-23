@@ -86,13 +86,15 @@ Each input type has its own properties and will be rendered in the UI in a diffe
 ```
 
 #### Column
-**`Column`** is an input type that allows selecting a column from an input table specified as `parent`. The `dataType` property is used to specify the data type of the columns that will be listed in the UI.
+**`Column`** is an input type that allows selecting a column from an input table specified as `parent`. The `dataType` property is used to specify the data type of the columns that will be listed in the UI. 
+
+*Note that the `dataType` property uses the Workflow Engine Data Types listed below, not the native cloud data warehouse data types.*
 ```json
     {
         "name": "column",
         "title": "Column value",
         "parent": "input_table",
-        "dataType": ["string", "boolean", "geography"],
+        "dataType": ["string", "number", "boolean", "geography"],
         "type": "Column"
     }
 ```
