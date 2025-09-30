@@ -1,0 +1,21 @@
+{
+  "name": "example_procedure",
+  "type": "procedure",
+  "description": "Example SQL procedure that logs data and returns a summary",
+  "parameters": [
+    {
+      "name": "input_table",
+      "type": "STRING",
+      "description": "Name of the input table to process"
+    },
+    {
+      "name": "log_message",
+      "type": "STRING",
+      "description": "Custom log message"
+    }
+  ],
+  "returns": {
+    "type": "STRING",
+    "description": "Summary message of the procedure execution"
+  }
+}

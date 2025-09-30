@@ -1,0 +1,31 @@
+{
+  "name": "example_python",
+  "type": "function",
+  "description": "Example Python function that calculates distance between two points",
+  "parameters": [
+    {
+      "name": "lat1",
+      "type": "FLOAT64",
+      "description": "Latitude of first point"
+    },
+    {
+      "name": "lon1",
+      "type": "FLOAT64",
+      "description": "Longitude of first point"
+    },
+    {
+      "name": "lat2",
+      "type": "FLOAT64",
+      "description": "Latitude of second point"
+    },
+    {
+      "name": "lon2",
+      "type": "FLOAT64",
+      "description": "Longitude of second point"
+    }
+  ],
+  "returns": {
+    "type": "FLOAT64",
+    "description": "Distance between the two points in kilometers"
+  }
+}

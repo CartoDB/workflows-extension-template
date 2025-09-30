@@ -1,0 +1,21 @@
+{
+  "name": "example_sql",
+  "type": "function",
+  "description": "Example SQL function that formats coordinates as a string",
+  "parameters": [
+    {
+      "name": "lat",
+      "type": "FLOAT",
+      "description": "Latitude"
+    },
+    {
+      "name": "lon",
+      "type": "FLOAT",
+      "description": "Longitude"
+    }
+  ],
+  "returns": {
+    "type": "STRING",
+    "description": "Formatted coordinates (e.g., '40.71, -74.01')"
+  }
+}

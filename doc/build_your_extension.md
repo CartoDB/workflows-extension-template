@@ -26,9 +26,11 @@
 
 8. (Optional) Include some icons for your extension and components. If not included, CARTO Workflows will render default ones for your components. [Learn more about creating icons for the extension and components](./icons.md).
 
-9. Repeat steps 3-8 for each component that is part of your extension package.
+9. (Optional) Create User Defined Functions (UDFs) by adding them to the `functions/` directory. UDFs are reusable functions that can be called from SQL queries and components. [Learn more about creating UDFs](./user_defined_functions.md).
 
-10. Use the `check` script to ensure that the extension is correctly defined.
+10. Repeat steps 3-9 for each component and function that is part of your extension package.
+
+11. Use the `check` script to ensure that the extension is correctly defined.
     ```bash
     $ python carto_extension.py check
     Checking extension...
@@ -39,7 +41,7 @@
 >
 > At this point, it is highly recommended that you create and run some tests for your components, so that consistency on the results is easy to check across different versions. Check [this section](./running-tests.md) to learn more about creating and running tests for your components.
 
-11. Use the `deploy` command to create the components in a specific destination in your data warehouse. This is specially useful while developing, as it will avoid having to package and manually install the extension with every change.
+12. Use the `deploy` command to create the components and functions in a specific destination in your data warehouse. This is specially useful while developing, as it will avoid having to package and manually install the extension with every change.
 
     > 📍 **IMPORTANT**
     >
@@ -63,7 +65,7 @@
 >
 > Make sure that your authenticated with your data warehouse before running the `deploy` command. Check [this section](./tooling.md#authentication-with-the-data-warehouse) to learn how to do it for different providers.
 
-12. Run the `package` command to create an `extension.zip` file that is ready to be distributed and installed in a CARTO Workflow. [Learn more about managing extension packages](https://docs.carto.com/carto-user-manual/workflows/extension-packages#managing-extension-packages).
+13. Run the `package` command to create an `extension.zip` file that is ready to be distributed and installed in a CARTO Workflow. [Learn more about managing extension packages](https://docs.carto.com/carto-user-manual/workflows/extension-packages#managing-extension-packages).
 
     ```bash
     $ python carto_extension.py package

@@ -1,0 +1,21 @@
+{
+  "name": "example_javascript",
+  "type": "function",
+  "description": "Example JavaScript UDF that multiplies two numbers",
+  "parameters": [
+    {
+      "name": "x",
+      "type": "FLOAT64"
+    },
+    {
+      "name": "y", 
+      "type": "FLOAT64"
+    }
+  ],
+  "returns": {
+    "type": "FLOAT64"
+  },
+  "extra_options": {
+    "description": "Multiplies two floating point numbers"
+  }
+}

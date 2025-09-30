@@ -1,0 +1,1 @@
+CONCAT(ROUND(lat, 2)::STRING, ', ', ROUND(lon, 2)::STRING)
