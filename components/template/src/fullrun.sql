@@ -8,6 +8,16 @@ AS SELECT *, \'''' || value || '''\' AS fixed_value_col
 FROM ''' || input_table;
 
 
+-- This is the sample code for the Oracle fullrun.
+-------------------------------------------------------
+/*
+EXECUTE IMMEDIATE '
+CREATE TABLE ' || output_table || ' AS
+SELECT t.*, ''' || value || ''' AS fixed_value_col
+FROM ' || input_table || ' t';
+*/
+
+
 -- This is the sample code for the Snowflake fullrun.
 ---------------------------------------------------------
 /*

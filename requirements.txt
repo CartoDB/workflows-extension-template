@@ -1,4 +1,5 @@
 google-cloud-bigquery
 snowflake-connector-python
+oracledb
 python-dotenv
 shapely
