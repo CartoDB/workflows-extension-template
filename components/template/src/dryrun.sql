@@ -10,6 +10,17 @@ WHERE 1 = 0;
 ''';
 
 
+-- This is the sample code for the Oracle dryrun.
+-------------------------------------------------------
+/*
+EXECUTE IMMEDIATE '
+CREATE TABLE ' || output_table || ' AS
+SELECT t.*, ''' || value || ''' AS fixed_value_col
+FROM ' || input_table || ' t
+WHERE 1 = 0';
+*/
+
+
 -- This is the sample code for the Snowflake dryrun.
 ---------------------------------------------------------
 /*
