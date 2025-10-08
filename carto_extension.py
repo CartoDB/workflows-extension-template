@@ -166,8 +166,9 @@ def get_procedure_code_bq(component):
     with open(dryrun_file, "r") as f:
         dryrun_code = f.read().replace("\n", "\n" + " " * 16)
 
-    newline_and_tab = ",\n" + " " * 12
-    params_string = newline_and_tab.join(
+    comma_newline_and_tab = ",\n" + " " * 12
+    newline_and_tab = "\n" + " " * 12
+    params_string = comma_newline_and_tab.join(
         [
             f"{p['name']} {_param_type_to_bq_type(p['type'])[0]}"
             for p in component["inputs"] + component["outputs"]
@@ -272,8 +273,9 @@ def get_procedure_code_sf(component):
     )
     with open(dryrun_file, "r") as f:
         dryrun_code = f.read().replace("\n", "\n" + " " * 16).replace("'", "\\'")
-    newline_and_tab = ",\n" + " " * 12
-    params_string = newline_and_tab.join(
+    comma_newline_and_tab = ",\n" + " " * 12
+    newline_and_tab = "\n" + " " * 12
+    params_string = comma_newline_and_tab.join(
         [
             f"{p['name']} {_param_type_to_sf_type(p['type'])[0]}"
             for p in component["inputs"] + component["outputs"]
@@ -350,9 +352,10 @@ def get_procedure_code_oracle(component):
     with open(dryrun_file, "r") as f:
         dryrun_code = _strip_sql_comments(f.read()).replace("\n", "\n" + " " * 12)
 
-    newline_and_tab = ",\n" + " " * 8
+    comma_newline_and_tab = ",\n" + " " * 8
+    newline_and_tab = "\n" + " " * 8
     # For procedure parameters, use the second type (without size) from the type mapping
-    params_string = newline_and_tab.join(
+    params_string = comma_newline_and_tab.join(
         [
             f"{p['name']} IN {_param_type_to_oracle_type(p['type'])[1]}"
             for p in component["inputs"]
@@ -363,7 +366,7 @@ def get_procedure_code_oracle(component):
     )
 
     carto_env_vars = component["cartoEnvVars"] if "cartoEnvVars" in component else []
-    env_vars = "\n" + " " * 8 + ("\n" + " " * 8).join(
+    env_vars = newline_and_tab + newline_and_tab.join(
         [
             f"{v} VARCHAR2 := JSON_VALUE(env_vars, '$.{v}');"
             for v in carto_env_vars
@@ -1006,7 +1009,7 @@ def test(component):
                         f"Dry run and full run schemas do not match "
                         f"in {component['title']} - {test_id} - {output_name}"
                     )
-            
+
             if str(test_id).startswith("skip_"):
                 # Don't compare results, it will only throw an error
                 # if there is an issue when running on BigQuery
