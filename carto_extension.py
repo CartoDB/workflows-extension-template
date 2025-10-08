@@ -285,7 +285,7 @@ def get_procedure_code_sf(component):
     carto_env_vars = component["cartoEnvVars"] if "cartoEnvVars" in component else []
     env_vars = newline_and_tab.join(
         [
-            f"DECLARE {v} VARCHAR DEFAULT JSON_EXTRACT_PATH_TEXT(env_vars, '{v}');"
+            f"{v} VARCHAR DEFAULT JSON_EXTRACT_PATH_TEXT(env_vars, \\'{v}\\');"
             for v in carto_env_vars
         ]
     )
@@ -300,8 +300,9 @@ def get_procedure_code_sf(component):
         LANGUAGE SQL
         EXECUTE AS CALLER
         AS '
-        BEGIN
+        {'DECLARE' if env_vars else ''}
             {env_vars}
+        BEGIN
             IF ( :dry_run ) THEN
                 DECLARE
                     _workflows_temp VARCHAR := \\'@@workflows_temp@@\\';
