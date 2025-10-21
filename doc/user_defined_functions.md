@@ -122,7 +122,7 @@ Support for standard SQL data types:
 
 **functions/format_coordinates/src/definition.sql**:
 ```sql
-CREATE OR REPLACE FUNCTION `@@destination@@`.FORMAT_COORDINATES(lat FLOAT64, lng FLOAT64)
+CREATE OR REPLACE FUNCTION `@@workflows_temp@@`.FORMAT_COORDINATES(lat FLOAT64, lng FLOAT64)
 RETURNS STRING
 LANGUAGE SQL
 AS (
@@ -137,7 +137,7 @@ The function definition will be automatically adapted for different providers:
 - **BigQuery**: Uses backticks and specific SQL syntax
 - **Snowflake**: Adapts to Snowflake's function syntax and data types
 
-Use the `@@destination@@` placeholder which will be replaced with the appropriate destination during deployment.
+Use the `@@workflows_temp@@` placeholder which will be replaced with the appropriate destination during deployment.
 
 ## Python Functions
 
