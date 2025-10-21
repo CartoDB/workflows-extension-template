@@ -1406,24 +1406,38 @@ def _get_test_results(metadata, component, progress_bar=None, use_ci_logging=Fal
             print(f"Processing component: {component['name']}")
         component_folder = os.path.join(components_folder, component["name"])
         test_folder = os.path.join(component_folder, "test")
-        # upload test tables
-        for filename in os.listdir(test_folder):
-            if filename.endswith(".ndjson"):
-                upload_function(os.path.join(test_folder, filename), component)
+        
         # run tests
         test_configuration_file = os.path.join(test_folder, "test.json")
         with open(test_configuration_file, "r") as f:
             test_configurations = json.loads(substitute_vars(f.read()))
 
-        component_results = {}
+        # Collect setup tables from all test configurations
+        setup_tables_map = {}  # filename -> table_name
         for test_configuration in test_configurations:
             setup_tables = test_configuration.get("setup_tables", {})
             for table_name, filename in setup_tables.items():
-                ndjson_full_path = os.path.join(test_folder, f"{filename}.ndjson")
-                if os.path.exists(ndjson_full_path):
-                    # Indicate this is a setup table with explicit naming
+                if filename not in setup_tables_map:
+                    setup_tables_map[filename] = table_name
+        
+        # Upload all test tables (setup tables with explicit naming, regular tables with prefix)
+        for filename in os.listdir(test_folder):
+            if filename.endswith(".ndjson"):
+                ndjson_full_path = os.path.join(test_folder, filename)
+                filename_without_ext = filename.replace(".ndjson", "")
+                
+                if filename_without_ext in setup_tables_map:
+                    # This is a setup table - upload with explicit naming
+                    table_name = setup_tables_map[filename_without_ext]
                     setup_component = {"name": table_name, "_is_setup_table": True}
                     upload_function(ndjson_full_path, setup_component)
+                else:
+                    # This is a regular test table - upload with prefix
+                    upload_function(ndjson_full_path, component)
+
+        component_results = {}
+        for test_configuration in test_configurations:
+            setup_tables = test_configuration.get("setup_tables", {})
 
             param_values = []
             test_id = test_configuration["id"]
