@@ -1,6 +1,7 @@
 google-cloud-bigquery[pandas]
 google-cloud-bigquery-storage
 snowflake-connector-python[secure-local-storage,pandas]
+oracledb
 python-dotenv
 shapely
 pytest

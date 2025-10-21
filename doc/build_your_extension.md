@@ -14,7 +14,7 @@
 
 4. Copy the `components/template` folder and rename it with the name of the component that you're going to develop (i.e. `mycomponent`).
 
-5. Edit the component metadata file in `components/mycomponent/metadata.json`. For a complete reference of the available options, see [this page](./doc/component_metadata.md).
+5. Edit the component metadata file in `components/mycomponent/metadata.json`. For a complete reference of the available options, see [this page](./component_metadata.md).
 
 6. Edit the `components/mycomponent/src/fullrun.sql` and `components/mycomponent/src/dryrun.sql` files to define the logic of the new component. For a complete guide, see [here](./doc/procedure.md).
 
