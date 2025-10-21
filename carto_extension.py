@@ -1473,7 +1473,8 @@ def _get_test_results(metadata, component, progress_bar=None, use_ci_logging=Fal
                 param_values.append(f"'{tablename}'")
                 tables[outputparam["name"]] = tablename
 
-            env_vars = json.dumps(test_configuration.get("env_vars", None))
+            env_vars_value = test_configuration.get("env_vars", None)
+            env_vars = f"'{json.dumps(env_vars_value)}'" if env_vars_value else None
 
             dry_run_params = param_values.copy() + [True, env_vars]
             dry_run_query = _build_query(
