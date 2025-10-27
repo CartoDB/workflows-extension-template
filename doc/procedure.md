@@ -138,10 +138,117 @@ analytics_toolbox_location=carto-un.carto
 This is purely for your development workflow and has no effect on how the extension works for end users who install it from CARTO UI.
 
 
-## Table names and API execution
+## Table Names and Execution Contexts
 
-When a workflow is run from the Workflows UI, table names of the tables created by its components are fully qualified. That means that, if your custom component is connected to an upstream components and uses a table from it, the name that it will received in the corresponding parameter will be a FQN (that is, in the form `project.dataset.table`). Output names received in the output parameters will also be FQNs.
+Your component will run in **two different execution contexts**, and table names are formatted differently in each:
 
-However, when the workflow is run as a stored procedure (when exported or when executed via API), all tables created in components are session tables that are single names (that is, something like `tablename` instead of `project.dataset.table`). That means that inputs that come from other components, and also output table names, will be single-name tables.
+### UI Execution Mode (Interactive)
 
-You should prepare your component to deal with this situation. Check the input/output table names to see whether they are fully-qualified or not, and implement the corresponding logic to run in each case.
+**When:** User runs a workflow from the Workflows UI
+
+**Table name format:** Fully Qualified Names (FQNs)
+- BigQuery: `project.dataset.table`
+- Snowflake: `DATABASE.SCHEMA.TABLE`
+
+**Example:**
+```sql
+-- input_table might contain:
+-- "my-project.my-dataset.input_data_abc123"
+
+-- output_table might contain:
+-- "my-project.my-dataset.output_result_xyz789"
+```
+
+**Why FQNs:**
+- Tables are created in persistent datasets/databases
+- Multiple users and workflows can run simultaneously
+- Each workflow run creates uniquely named tables
+- Tables persist for inspection and debugging
+
+### API Execution Mode (Programmatic)
+
+**When:** Workflow is executed via API or as an exported stored procedure
+
+**Table name format:** Session tables (simple names)
+- All providers: `tablename` (no project/dataset/database prefix)
+
+**Example:**
+```sql
+-- input_table might contain:
+-- "temp_input_1"
+
+-- output_table might contain:
+-- "temp_output_1"
+```
+
+**Why session tables:**
+- Tables only exist for the duration of the procedure execution
+- Simpler namespace management
+- Automatic cleanup when session ends
+- Faster execution (no persistent storage overhead)
+
+### Writing Compatible Components
+
+**Good news:** In most cases, you don't need special handling! The table reference syntax is identical for both FQN and session tables.
+
+**Example that works in both contexts:**
+```sql
+EXECUTE IMMEDIATE '''
+CREATE TABLE IF NOT EXISTS ''' || output_table || '''
+AS SELECT * FROM ''' || input_table || '''
+WHERE condition = true;
+''';
+```
+
+This works because:
+- If `input_table = "project.dataset.table1"` → `FROM project.dataset.table1` ✓
+- If `input_table = "table1"` → `FROM table1` ✓
+
+### When You Need Context Detection
+
+You only need to detect the execution context if your component logic needs to behave differently based on table persistence.
+
+**Detection pattern:**
+```sql
+-- Check if table name contains a dot (indicates FQN)
+DECLARE is_fqn BOOL;
+SET is_fqn = REGEXP_CONTAINS(input_table, r'\.');
+
+IF is_fqn THEN
+  -- UI execution: tables persist, can do post-processing
+  -- Example: Create indexes, analyze statistics, etc.
+ELSE
+  -- API execution: session tables, keep processing simple
+  -- Example: Skip optimization steps
+END IF;
+```
+
+### Important Considerations
+
+**Do:**
+- ✅ Use table name variables exactly as provided (`input_table`, `output_table`)
+- ✅ Assume either format could be passed
+- ✅ Use `EXECUTE IMMEDIATE` for dynamic table names
+- ✅ Test your component in both contexts
+
+**Don't:**
+- ❌ Hardcode table names
+- ❌ Assume tables will always be FQNs
+- ❌ Assume tables will always be session tables
+- ❌ Parse or modify table names unless absolutely necessary
+
+### Testing Both Contexts
+
+**UI context (during development):**
+```bash
+# Deploy creates actual tables with FQNs
+python carto_extension.py deploy --destination=myproject.mydataset
+```
+
+**API context (via tests):**
+```bash
+# Tests typically use session tables
+python carto_extension.py test
+```
+
+Both should work without code changes!
