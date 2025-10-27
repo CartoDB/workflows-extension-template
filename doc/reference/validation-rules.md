@@ -193,18 +193,40 @@ SELECT *, GENERATE_UUID() AS uuid FROM input_table
 SELECT *, "uuid_string" AS uuid FROM input_table WHERE 1 = 0
 ```
 
-### Placeholder Substitution
+### Analytics Toolbox Location Reference
 
-| Placeholder | Format | Example | Substituted From |
-|-------------|--------|---------|------------------|
-| Environment variable | `@@variable_name@@` | `@@analytics_toolbox@@` | `.env` file or system env vars |
-| Usage context | SQL, test configs, fixtures | `SELECT * FROM @@project@@.dataset.table` | Any text file in repo |
+**Two approaches for different use cases:**
 
-**Rules:**
-- Placeholders replaced during `test` and `capture` commands
-- NOT replaced during `package` (deferred to CARTO installation)
-- Case-insensitive matching: `@@VAR@@` matches `var` or `VAR`
-- Reverse substitution on capture (values → placeholders in fixtures)
+#### Approach 1: Placeholder (for procedure definitions)
+
+| Aspect | Details |
+|--------|---------|
+| **Placeholder** | `@@analytics_toolbox_location@@` |
+| **Usage** | `SELECT @@analytics_toolbox_location@@.FUNCTION_NAME(geom) FROM table` |
+| **Use case** | When FQN must be in the stored procedure definition |
+| **When substituted** | Once at extension installation time (static) |
+| **Substituted with** | Connection-specific location (e.g., `carto-un.carto`) |
+| **Who performs substitution** | CARTO Workflows frontend during installation |
+| **Availability** | **BigQuery only** |
+
+#### Approach 2: cartoEnvVars (for dynamic SQL)
+
+| Aspect | Details |
+|--------|---------|
+| **Variable** | `analyticsToolboxDataset` |
+| **Declaration** | Add to `cartoEnvVars` array in component metadata |
+| **Usage** | `''' || analyticsToolboxDataset || '''.FUNCTION_NAME(geom)` (in EXECUTE IMMEDIATE) |
+| **Use case** | When building SQL dynamically |
+| **When evaluated** | At workflow execution time (dynamic) |
+| **Evaluated by** | CARTO Workflows when generating SQL |
+| **Flexibility** | Can change if connection settings change |
+| **Availability** | BigQuery, Snowflake, Oracle |
+
+**Key Difference:**
+- **Placeholder** = Baked into procedure definition at installation time
+- **cartoEnvVars** = Evaluated when building dynamic SQL at execution time
+
+**For local testing:** Define in `.env` file as `analytics_toolbox_location=carto-un.carto`
 
 ---
 

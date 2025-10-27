@@ -134,7 +134,7 @@ In Column inputs, the `parent` property specifies which Table input contains the
 Hint text displayed in an empty input field. Defined by the `placeholder` property.
 
 ### Placeholder Substitution
-Process of replacing `@@variable_name@@` patterns in SQL with values from environment variables or `.env` file. Used for testing and deployment flexibility.
+The process of replacing `@@analytics_toolbox_location@@` in stored procedure SQL with the actual Analytics Toolbox location at extension installation time. **BigQuery only**. This is a **static, one-time** substitution performed by the CARTO Workflows frontend when a user installs the extension, baking the FQN into the procedure definition. This is different from `cartoEnvVars` like `analyticsToolboxDataset`, which are **dynamically evaluated** at workflow execution time when building SQL. Each approach serves different use cases based on how the component is structured. The `.env` file is only used for local testing during development.
 
 ### Provider
 The data warehouse platform an extension targets. Valid values: `"bigquery"`, `"snowflake"`, `"oracle"`. Specified in extension metadata.
