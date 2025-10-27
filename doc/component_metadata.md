@@ -59,6 +59,8 @@ Some important notes about the metadata structure:
 * `inputs`: Array of input parameters the component accepts
 * `outputs`: Array of output parameters the component produces
 
+> **🤖 For AI Agents:** See [Component Metadata Schema](./reference/component-metadata-schema.json) for formal validation rules and [Validation Rules](./reference/validation-rules.md) for all constraints in tabular format.
+
 ## Inputs
 
 There are different types of inputs that can be used in the `inputs` array. 

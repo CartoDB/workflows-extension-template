@@ -12,6 +12,10 @@ see-also: [quickstart.md]
 
 ##### A step by step guide
 
+> **💡 Quick Start:** For a faster, minimal path to your first component, see the [Quickstart Guide](./quickstart.md) (5 minutes).
+>
+> **🤖 For AI Agents:** See [Quick Reference](./reference/quick-reference.md) for commands and patterns, and [Examples](./examples/) for working code.
+
 1. Create a new repository from this template. [See the oficial GitHub docs](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
 
 2. Navigate to the repository folder and install the requirements needed by the repository scripts. Python 3 is required to run the repository scripts:

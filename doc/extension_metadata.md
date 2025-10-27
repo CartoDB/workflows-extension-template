@@ -11,6 +11,8 @@ see-also: [reference/extension-metadata-schema.json]
 # Extension metadata
 Here you can find a reference of the different properties that must be contained in the metadata object of the extension.
 
+> **🤖 For AI Agents:** See [Extension Metadata Schema](./reference/extension-metadata-schema.json) for formal validation rules and [Validation Rules](./reference/validation-rules.md) for all constraints in tabular format.
+
 This is the expected structure of the metadata file:
 ```json
 {

@@ -18,7 +18,13 @@ Find more documentation about installing and managing extension packages in [thi
 
 > Currently, Extension Packages are supported in Workflows created for **BigQuery**, **Snowflake**, and **Oracle** connections.
 
-Learn more about building, testing, and distributing extension packages for CARTO Workflows in the following sections: 
+## Documentation
+
+This repository contains comprehensive documentation for both **human developers** and **AI agents**.
+
+### 👤 For Human Developers
+
+Learn more about building, testing, and distributing extension packages:
 
 ### 🧬 [Anatomy of an extension package](./doc/anatomy_of_an_extension.md)
 This document describes the different elements that are needed to build an extension package and how they relate to each other. 
@@ -41,3 +47,34 @@ Learn how to configure, run and automate different tests for your components.
 
 ### 🧰 [Tools](./doc/tooling.md)
 Learn how to use the tools included with this template to help with the creation of extension packages.
+
+---
+
+### 🤖 For AI Agents
+
+Optimized documentation for programmatic consumption and rapid navigation:
+
+**Quick Start:**
+- [**Quickstart Guide**](./doc/quickstart.md) - Minimal 5-minute path to first component
+- [**Quick Reference**](./doc/reference/quick-reference.md) - One-page cheat sheet with patterns and commands
+- [**Glossary**](./doc/glossary.md) - All domain terms and definitions
+
+**Reference:**
+- [**Validation Rules**](./doc/reference/validation-rules.md) - Complete constraints in scannable tables
+- [**Extension Metadata Schema**](./doc/reference/extension-metadata-schema.json) - JSON Schema for validation
+- [**Component Metadata Schema**](./doc/reference/component-metadata-schema.json) - JSON Schema for validation
+
+**Examples:**
+- [**Examples Index**](./doc/examples/README.md) - Working component examples with tests
+  - [Minimal Component](./doc/examples/01-minimal-component/) - Complete working example
+  - [Multi-Input Component](./doc/examples/02-multi-input-component/) - All input types
+  - [Conditional Inputs](./doc/examples/03-conditional-inputs/) - ShowIf patterns
+
+**Patterns:**
+- [**Template SQL (Annotated)**](./components/template/src/) - Heavily commented fullrun.sql and dryrun.sql explaining patterns
+
+**Navigation Tips for Agents:**
+- Check frontmatter `depends-on` for document dependencies
+- Use `tags` for topic-based navigation
+- Reference JSON Schemas for validation
+- Start with Quick Reference for fast lookups

@@ -8,6 +8,9 @@ tags: [reference, tools, cli, commands, authentication]
 ---
 
 # Tooling
+
+> **🤖 For AI Agents:** See [Quick Reference - CLI Commands](./reference/quick-reference.md#cli-commands) for a cheat sheet of all commands.
+
 This template comes with a Python tool that help with usual tasks when creating extension packages. 
 
 ## Authentication with the Data Warehouse

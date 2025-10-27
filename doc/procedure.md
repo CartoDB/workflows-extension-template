@@ -12,6 +12,10 @@ see-also: [glossary.md]
 
 The component's logic should be implemented in the `fullrun.sql` and `dryrun.sql` files.
 
+> **💡 Example:** See the [annotated template files](../components/template/src/) for detailed pattern explanations with comments.
+>
+> **🤖 For AI Agents:** Check [Quick Reference](./reference/quick-reference.md) for SQL pattern snippets and [Validation Rules](./reference/validation-rules.md) for SQL constraints.
+
 ## Dry runs
 
 Workflows needs to perform a dry-run query before the actual execution of the workflow, in order to determine the resulting schema of each node.

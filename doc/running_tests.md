@@ -9,6 +9,10 @@ tags: [testing, validation, automation, ci, fixtures]
 
 # Running tests
 
+> **💡 Example:** See the [minimal component example](./examples/01-minimal-component/test/) for a complete working test setup.
+>
+> **🤖 For AI Agents:** Check [Validation Rules - Test Configuration Constraints](./reference/validation-rules.md#test-configuration-constraints) for test structure requirements.
+
 This document goes over the basic steps to create tests for the components included in your extension
 
 ## Data Warehouse configuration
