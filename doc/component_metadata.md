@@ -1,3 +1,13 @@
+---
+title: Component Metadata Reference
+description: Complete reference for component metadata.json including all input types, outputs, and configuration options
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [icons.md, procedure.md]
+tags: [reference, metadata, component, inputs, outputs, schema]
+see-also: [reference/component-metadata-schema.json, glossary.md]
+---
+
 # Component metadata
 
 Here you can find a reference of the different properties that must be contained in the metadata object of the component.

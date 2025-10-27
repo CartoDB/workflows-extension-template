@@ -1,0 +1,147 @@
+{
+  "_comment": "This example demonstrates various input types in a single component",
+
+  "name": "multi_input_demo",
+  "title": "Multi-Input Demo",
+  "description": "Demonstrates all common input types: Table, Column, String, Number, Boolean, Selection, Range",
+  "version": "1.0.0",
+  "icon": "component_icon.svg",
+  "cartoEnvVars": [],
+
+  "inputs": [
+    {
+      "_comment": "INPUT TYPE: Table - represents upstream workflow connection",
+      "name": "input_table",
+      "title": "Input table",
+      "description": "Source data table",
+      "type": "Table"
+    },
+    {
+      "_comment": "INPUT TYPE: Column - allows selecting a column from the parent table",
+      "name": "id_column",
+      "title": "ID column",
+      "description": "Column containing unique identifiers",
+      "parent": "input_table",
+      "dataType": ["string", "number"],
+      "type": "Column",
+      "helper": "Column inputs filter based on dataType array"
+    },
+    {
+      "_comment": "INPUT TYPE: String - single-line text input",
+      "name": "label",
+      "title": "Label",
+      "description": "Text label to apply",
+      "type": "String",
+      "placeholder": "Enter label...",
+      "default": "default_label",
+      "helper": "String inputs can have placeholders and defaults"
+    },
+    {
+      "_comment": "INPUT TYPE: String with multiline mode - textarea",
+      "name": "description",
+      "title": "Description",
+      "description": "Longer text description",
+      "type": "String",
+      "mode": "multiline",
+      "optional": true,
+      "helper": "Use mode: multiline for longer text inputs"
+    },
+    {
+      "_comment": "INPUT TYPE: Number - numeric input",
+      "name": "threshold",
+      "title": "Threshold",
+      "description": "Numeric threshold value",
+      "type": "Number",
+      "min": 0,
+      "max": 100,
+      "default": 50,
+      "helper": "Number inputs can specify min/max ranges"
+    },
+    {
+      "_comment": "INPUT TYPE: Number with slider mode",
+      "name": "radius",
+      "title": "Radius (km)",
+      "description": "Search radius in kilometers",
+      "type": "Number",
+      "mode": "slider",
+      "min": 1,
+      "max": 100,
+      "default": 10,
+      "helper": "Use mode: slider for visual range selection"
+    },
+    {
+      "_comment": "INPUT TYPE: Boolean - checkbox",
+      "name": "include_nulls",
+      "title": "Include null values",
+      "description": "Whether to include rows with null values",
+      "type": "Boolean",
+      "default": false,
+      "helper": "Boolean inputs render as checkboxes"
+    },
+    {
+      "_comment": "INPUT TYPE: Selection - dropdown menu",
+      "name": "aggregation_method",
+      "title": "Aggregation method",
+      "description": "How to aggregate values",
+      "type": "Selection",
+      "options": ["sum", "avg", "min", "max", "count"],
+      "default": "avg",
+      "helper": "Selection inputs create dropdown menus"
+    },
+    {
+      "_comment": "INPUT TYPE: Selection with multiple mode",
+      "name": "categories",
+      "title": "Categories",
+      "description": "Select one or more categories",
+      "type": "Selection",
+      "mode": "multiple",
+      "options": ["Category A", "Category B", "Category C", "Category D"],
+      "optional": true,
+      "helper": "Use mode: multiple for multi-select dropdowns"
+    },
+    {
+      "_comment": "INPUT TYPE: Range - min/max selector",
+      "name": "value_range",
+      "title": "Value range",
+      "description": "Minimum and maximum values",
+      "type": "Range",
+      "helper": "Range inputs return array: [min, max]"
+    },
+    {
+      "_comment": "ADVANCED OPTION: Groups less common inputs under 'Advanced'",
+      "name": "advanced_setting",
+      "title": "Advanced setting",
+      "description": "An advanced configuration option",
+      "type": "String",
+      "advanced": true,
+      "optional": true,
+      "helper": "Use advanced: true to collapse input under 'Advanced options'"
+    }
+  ],
+
+  "outputs": [
+    {
+      "name": "output_table",
+      "title": "Output table",
+      "description": "Processed result table",
+      "type": "Table"
+    }
+  ],
+
+  "_implementation_note": "This example shows metadata only. For SQL implementation, follow patterns in 01-minimal-component/fullrun.sql and dryrun.sql. All input values become variables you can use in SQL.",
+
+  "_usage_in_sql": {
+    "_comment": "How these inputs are accessed in fullrun.sql/dryrun.sql:",
+    "input_table": "String containing table FQN or session name",
+    "id_column": "String containing column name (e.g., 'user_id')",
+    "label": "String value",
+    "description": "String value (can be multiline)",
+    "threshold": "Number value",
+    "radius": "Number value",
+    "include_nulls": "Boolean (true/false)",
+    "aggregation_method": "String (one of the options)",
+    "categories": "Array of strings (e.g., ['Category A', 'Category B'])",
+    "value_range": "Array of strings (e.g., ['10', '100'])",
+    "advanced_setting": "String or NULL if not provided (optional)"
+  }
+}

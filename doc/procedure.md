@@ -1,3 +1,13 @@
+---
+title: Writing Component Stored Procedures
+description: Guide to implementing component logic in fullrun.sql and dryrun.sql with SQL patterns and best practices
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [component_metadata.md]
+tags: [sql, stored-procedures, logic, implementation, patterns]
+see-also: [glossary.md]
+---
+
 # Writing the component procedure
 
 The component's logic should be implemented in the `fullrun.sql` and `dryrun.sql` files.

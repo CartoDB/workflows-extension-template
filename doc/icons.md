@@ -1,3 +1,12 @@
+---
+title: Icon Specifications
+description: Detailed specifications and recommendations for extension and component icons
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: []
+tags: [reference, icons, design, specifications]
+---
+
 # Icons
 
 This document contains detailed information and recommendation about the icons that can be used for an extensions and its components.

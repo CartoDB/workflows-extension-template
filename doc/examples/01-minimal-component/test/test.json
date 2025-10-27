@@ -1,0 +1,10 @@
+[
+  {
+    "_comment": "Test 1: Basic functionality with default value",
+    "id": 1,
+    "inputs": {
+      "input_table": "input_data",
+      "constant_value": "test_value"
+    }
+  }
+]

@@ -1,3 +1,13 @@
+---
+title: Build Your Own Extension - Step by Step
+description: Complete step-by-step guide for creating, testing, and deploying a CARTO Workflows extension
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [anatomy_of_an_extension.md, component_metadata.md, procedure.md, icons.md, running_tests.md, tooling.md]
+tags: [tutorial, guide, getting-started, workflow]
+see-also: [quickstart.md]
+---
+
 ## Build your own extension
 
 ##### A step by step guide

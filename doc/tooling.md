@@ -1,3 +1,12 @@
+---
+title: Tooling Reference
+description: Reference for the carto_extension.py Python tool and its commands for building extensions
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [running_tests.md]
+tags: [reference, tools, cli, commands, authentication]
+---
+
 # Tooling
 This template comes with a Python tool that help with usual tasks when creating extension packages. 
 

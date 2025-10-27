@@ -1,0 +1,43 @@
+{
+  "_comment": "This is the simplest possible component metadata",
+
+  "name": "add_constant_column",
+  "title": "Add Constant Column",
+  "description": "Adds a column with a constant value to the input table. Demonstrates the minimal viable component pattern.",
+  "version": "1.0.0",
+  "icon": "component_icon.svg",
+
+  "_comment_cartoEnvVars": "Required but can be empty array if no env vars needed",
+  "cartoEnvVars": [],
+
+  "_comment_inputs": "Every component needs at least one input",
+  "inputs": [
+    {
+      "_comment": "Table input represents upstream connection in workflow",
+      "name": "input_table",
+      "title": "Input table",
+      "description": "The table to add the column to",
+      "type": "Table"
+    },
+    {
+      "_comment": "String input for user to provide the constant value",
+      "name": "constant_value",
+      "title": "Constant value",
+      "description": "The value to add in the new column",
+      "type": "String",
+      "default": "default_value",
+      "placeholder": "Enter a value..."
+    }
+  ],
+
+  "_comment_outputs": "Components must have at least one output",
+  "outputs": [
+    {
+      "_comment": "Output table contains result (typically input + new columns)",
+      "name": "output_table",
+      "title": "Output table",
+      "description": "The input table with an additional constant_col column",
+      "type": "Table"
+    }
+  ]
+}

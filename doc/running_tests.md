@@ -1,3 +1,12 @@
+---
+title: Running Tests
+description: Guide to configuring, creating, running, and automating tests for extension components
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [tooling.md, anatomy_of_an_extension.md]
+tags: [testing, validation, automation, ci, fixtures]
+---
+
 # Running tests
 
 This document goes over the basic steps to create tests for the components included in your extension

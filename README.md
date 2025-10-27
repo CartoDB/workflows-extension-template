@@ -1,3 +1,12 @@
+---
+title: CARTO Workflows Extension Template
+description: Template repository for creating custom extension packages for CARTO Workflows
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: []
+tags: [overview, getting-started, template]
+---
+
 # Extension Packages for CARTO Workflows
 Use this template repository as a framework for creating extension packages for CARTO Workflows, containing custom components that are tailored to your specific use cases. 
 
