@@ -1,6 +1,20 @@
+---
+title: Build Your Own Extension - Step by Step
+description: Complete step-by-step guide for creating, testing, and deploying a CARTO Workflows extension
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [anatomy_of_an_extension.md, component_metadata.md, procedure.md, icons.md, running_tests.md, tooling.md]
+tags: [tutorial, guide, getting-started, workflow]
+see-also: [quickstart.md]
+---
+
 ## Build your own extension
 
 ##### A step by step guide
+
+> **💡 Quick Start:** For a faster, minimal path to your first component, see the [Quickstart Guide](./quickstart.md) (5 minutes).
+>
+> **🤖 For AI Agents:** See [Quick Reference](./reference/quick-reference.md) for commands and patterns, and [Examples](./examples/) for working code.
 
 1. Create a new repository from this template. [See the oficial GitHub docs](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
 

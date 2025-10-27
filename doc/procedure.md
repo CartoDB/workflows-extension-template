@@ -1,6 +1,20 @@
+---
+title: Writing Component Stored Procedures
+description: Guide to implementing component logic in fullrun.sql and dryrun.sql with SQL patterns and best practices
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [component_metadata.md]
+tags: [sql, stored-procedures, logic, implementation, patterns]
+see-also: [glossary.md]
+---
+
 # Writing the component procedure
 
 The component's logic should be implemented in the `fullrun.sql` and `dryrun.sql` files.
+
+> **💡 Example:** See the [annotated template files](../components/template/src/) for detailed pattern explanations with comments.
+>
+> **🤖 For AI Agents:** Check [Quick Reference](./reference/quick-reference.md) for SQL pattern snippets and [Validation Rules](./reference/validation-rules.md) for SQL constraints.
 
 ## Dry runs
 
@@ -47,11 +61,81 @@ The `input` and `output` variables will contain the names of the input table tha
 
 Do not generate tables with names others than the ones provided in the variables corresponding to output parameters. Otherwise, those tables will not be used when the component output is connected to another component in the workflow.
 
-## Replacing placeholders with environment variables
+## Referencing CARTO Analytics Toolbox
 
-You can use placeholders in your code as `@@variable_name@@`. Then you can define the environment variable `var_name` (or `VAR_NAME`) in your system variables or in an `.env` file in the repository folder, and the placeholder will be replaced when testing or deploying the application. This will work in the code, test configurations and test fixtures. This substitution is **not** performed when packaging the application - in that case it is delegated to CARTO on installation (for example, to substitute `@@analytics_toolbox_location@@` accordingly).
+If your component uses CARTO Analytics Toolbox functions, you need to choose the appropriate approach based on how your component is structured:
 
-When capturing test results, the inverse substitution will be performed so that all values present in the `.env` file will be subtitued with their respectives `@@variable_name` in the fixtures. Please takee into account that, while the aforementioned substitution can use all your environment variables, this reverse-substitution will only automatically apply those variables present in the `.env` file.
+### Approach 1: Using the @@analytics_toolbox_location@@ placeholder
+
+Use the `@@analytics_toolbox_location@@` placeholder directly in your stored procedure SQL:
+
+```sql
+CREATE OR REPLACE PROCEDURE component_procedure()
+BEGIN
+  SELECT @@analytics_toolbox_location@@.FUNCTION_NAME(geography_column)
+  FROM input_table;
+END;
+```
+
+**How it works:**
+- The placeholder `@@analytics_toolbox_location@@` is **replaced at extension installation time** in the Workflows UI
+- The FQN is **baked into the stored procedure definition** when the extension is installed
+- This substitution happens **once** when the user installs your extension
+- The placeholder is replaced with the connection-specific location (e.g., `carto-un.carto`)
+
+**When to use:**
+- When the Analytics Toolbox FQN needs to be part of the procedure definition itself
+- **Required for BigQuery** when function references are in the procedure body
+- **BigQuery only** - not available for other providers
+
+### Approach 2: Using cartoEnvVars
+
+Declare `analyticsToolboxDataset` in your component's `cartoEnvVars` array:
+
+```json
+{
+  "cartoEnvVars": ["analyticsToolboxDataset"],
+  ...
+}
+```
+
+Then use it as a variable in dynamic SQL:
+
+```sql
+EXECUTE IMMEDIATE '''
+SELECT ''' || analyticsToolboxDataset || '''.FUNCTION_NAME(geography_column)
+FROM ''' || input_table;
+```
+
+**How it works:**
+- The variable `analyticsToolboxDataset` is **evaluated at workflow execution time**
+- Workflows injects the correct value when building the SQL dynamically
+- The value can adapt if connection settings change
+
+**When to use:**
+- When building SQL dynamically with `EXECUTE IMMEDIATE`
+- Works across BigQuery, Snowflake, and Oracle
+- When you need flexibility for the location to change after installation
+
+### Key Differences
+
+| Aspect | Placeholder | cartoEnvVars |
+|--------|-------------|--------------|
+| **When evaluated** | At extension installation (static) | At workflow execution (dynamic) |
+| **Use case** | FQN in procedure definition | FQN in dynamic SQL |
+| **Flexibility** | Fixed at installation | Can change with connection settings |
+| **Availability** | **BigQuery only** | BigQuery, Snowflake, Oracle |
+| **Context** | Baked into stored procedure | Evaluated when building SQL |
+
+### For Local Testing
+
+When running `python carto_extension.py test` or `deploy` locally, you can define the placeholder in a `.env` file:
+
+```
+analytics_toolbox_location=carto-un.carto
+```
+
+This is purely for your development workflow and has no effect on how the extension works for end users who install it from CARTO UI.
 
 
 ## Table names and API execution

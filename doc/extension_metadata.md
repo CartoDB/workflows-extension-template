@@ -1,5 +1,17 @@
+---
+title: Extension Metadata Reference
+description: Complete reference for the root metadata.json file that defines extension-level properties
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [icons.md]
+tags: [reference, metadata, extension, schema]
+see-also: [reference/extension-metadata-schema.json]
+---
+
 # Extension metadata
 Here you can find a reference of the different properties that must be contained in the metadata object of the extension.
+
+> **🤖 For AI Agents:** See [Extension Metadata Schema](./reference/extension-metadata-schema.json) for formal validation rules and [Validation Rules](./reference/validation-rules.md) for all constraints in tabular format.
 
 This is the expected structure of the metadata file:
 ```json

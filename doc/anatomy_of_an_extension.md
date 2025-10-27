@@ -1,4 +1,15 @@
+---
+title: Anatomy of an Extension Package
+description: Complete overview of extension package structure, components, metadata, and testing
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [extension_metadata.md, component_metadata.md, procedure.md, icons.md, running_tests.md]
+tags: [architecture, overview, structure, reference]
+---
+
 # Anatomy of an Extension Package
+
+> **🤖 For AI Agents:** For a structured overview with file requirements and validation rules, see [Validation Rules - File Structure Requirements](./reference/validation-rules.md#file-structure-requirements).
 
 Each extension package contains a single file with **metadata** about the extension and one or more **components**.
 This is a simplified diagram of the folder structure of an extension package:

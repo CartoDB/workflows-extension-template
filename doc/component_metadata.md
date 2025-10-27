@@ -1,3 +1,13 @@
+---
+title: Component Metadata Reference
+description: Complete reference for component metadata.json including all input types, outputs, and configuration options
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [icons.md, procedure.md]
+tags: [reference, metadata, component, inputs, outputs, schema]
+see-also: [reference/component-metadata-schema.json, glossary.md]
+---
+
 # Component metadata
 
 Here you can find a reference of the different properties that must be contained in the metadata object of the component.
@@ -48,6 +58,8 @@ Some important notes about the metadata structure:
 * `cartoEnvVars`: Array of environment variables the component needs access to. The only supported variables are the ones listed in the [CARTO environment variables](#carto-environment-variables) section. The option is mandatory but can be an empty array if the component doesn't need any environment variables.
 * `inputs`: Array of input parameters the component accepts
 * `outputs`: Array of output parameters the component produces
+
+> **🤖 For AI Agents:** See [Component Metadata Schema](./reference/component-metadata-schema.json) for formal validation rules and [Validation Rules](./reference/validation-rules.md) for all constraints in tabular format.
 
 ## Inputs
 
