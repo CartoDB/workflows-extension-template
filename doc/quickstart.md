@@ -181,7 +181,7 @@ AS SELECT *, GENERATE_UUID() AS uuid
 FROM ''' || input_table || ';';
 ```
 
-**`dryrun.sql`** - Schema preview:
+**`dryrun.sql`** - Schema preview (must match fullrun schema exactly):
 ```sql
 EXECUTE IMMEDIATE '''
 CREATE TABLE IF NOT EXISTS ''' || output_table || '''
@@ -192,10 +192,12 @@ WHERE 1 = 0;
 ''';
 ```
 
-Key differences:
-- Dry run uses `WHERE 1 = 0` to return no rows
-- Dry run uses a string literal instead of `GENERATE_UUID()` (faster, same schema)
-- Both create same table structure
+**Key requirements for dryrun.sql:**
+- 🚨 **MUST produce exact same schema as fullrun.sql** (same columns, names, types, order)
+- ✅ Uses `WHERE 1 = 0` to return zero rows (fast)
+- ✅ Uses string literal `"uuid_string"` instead of `GENERATE_UUID()` (optimization, same STRING type)
+- ✅ Keeps same FROM clause and SELECT structure as fullrun
+- ⚠️ **Common mistake:** Creating query without FROM clause or with different columns
 
 ## Variable Mapping
 

@@ -9,12 +9,25 @@
 -- component's output BEFORE executing the full workflow. This allows the UI
 -- to show schema information and validate connections between components.
 --
--- KEY REQUIREMENT:
--- Must produce EXACTLY the same schema as fullrun.sql, but return ZERO rows.
---
--- OPTIMIZATION STRATEGY:
--- Replace expensive operations (functions, computations) with literals that
--- produce the same data type. This makes dry runs fast regardless of data size.
+-- ╔══════════════════════════════════════════════════════════════════════════╗
+-- ║  🚨 CRITICAL: SCHEMA MUST MATCH FULLRUN.SQL EXACTLY                      ║
+-- ║                                                                          ║
+-- ║  The dryrun.sql MUST produce the EXACT SAME output schema as fullrun:   ║
+-- ║  ✅ Same column names (case-sensitive)                                   ║
+-- ║  ✅ Same column types                                                    ║
+-- ║  ✅ Same column order                                                    ║
+-- ║  ✅ Same number of columns                                               ║
+-- ║  ✅ Zero rows (use WHERE 1 = 0)                                          ║
+-- ║                                                                          ║
+-- ║  The QUERY can differ to optimize performance:                          ║
+-- ║  • Replace expensive functions with cheap literals (same type)          ║
+-- ║  • Simplify computations while maintaining output types                 ║
+-- ║  • BUT: Always reference the same input tables                          ║
+-- ║  • BUT: Maintain the same SELECT structure                              ║
+-- ║                                                                          ║
+-- ║  🎯 GOLDEN RULE: Generate exactly the same schema as the full run,      ║
+-- ║     as simply as possible.                                              ║
+-- ╚══════════════════════════════════════════════════════════════════════════╝
 --
 -- AVAILABLE VARIABLES:
 -- Same as fullrun.sql - all inputs, outputs, and cartoEnvVars from metadata.json
@@ -155,20 +168,51 @@ EXECUTE IMMEDIATE '
 -- COMMON MISTAKES TO AVOID
 -- ============================================================================
 
--- ❌ MISTAKE 1: Forgetting WHERE 1 = 0
--- Result: Dryrun processes all data (slow, expensive, defeats purpose)
+-- ❌ MISTAKE 1: Query without FROM clause (CRITICAL ERROR!)
+-- WRONG:
+--   SELECT "literal_value" AS col WHERE 1 = 0;
+-- Result: Completely different schema - missing all input table columns!
+-- FIX: Always include FROM clause matching fullrun.sql inputs
 --
 -- ❌ MISTAKE 2: Different column names/order than fullrun
+-- WRONG:
+--   fullrun: SELECT *, value AS result_col
+--   dryrun:  SELECT *, value AS output_col  -- Different name!
 -- Result: Workflows UI shows wrong schema, connections fail
+-- FIX: Copy exact column names and order from fullrun.sql
 --
 -- ❌ MISTAKE 3: Different data types than fullrun
+-- WRONG:
+--   fullrun: SELECT CAST(x AS FLOAT64) AS metric
+--   dryrun:  SELECT "123" AS metric  -- STRING instead of FLOAT64!
 -- Result: Type mismatches when connecting to downstream components
+-- FIX: Match types exactly, use CAST if needed
 --
--- ❌ MISTAKE 4: Keeping expensive operations
--- Result: Dryrun takes long time, especially on large tables
+-- ❌ MISTAKE 4: Forgetting WHERE 1 = 0
+-- WRONG:
+--   SELECT *, "value" FROM input_table;  -- No WHERE clause!
+-- Result: Dryrun processes all data (slow, expensive, defeats purpose)
+-- FIX: Always add WHERE 1 = 0 at the end
 --
--- ❌ MISTAKE 5: Different table OPTIONS than fullrun
+-- ❌ MISTAKE 5: Missing or different number of columns
+-- WRONG:
+--   fullrun: SELECT col_a, col_b, col_c, new_col
+--   dryrun:  SELECT col_a, col_b, new_col  -- Missing col_c!
+-- Result: Schema mismatch, downstream components break
+-- FIX: Count columns - must match exactly
+--
+-- ❌ MISTAKE 6: Keeping expensive operations
+-- WRONG:
+--   SELECT *, GENERATE_UUID() FROM input WHERE 1 = 0;  -- Still calls function!
+-- Result: Dryrun takes long time (even with 0 rows, function may execute)
+-- FIX: Replace with cheap literal: "uuid_literal"
+--
+-- ❌ MISTAKE 7: Different table OPTIONS than fullrun
+-- WRONG:
+--   fullrun: OPTIONS (expiration_timestamp = ...)
+--   dryrun:  No OPTIONS clause
 -- Result: Inconsistent behavior between preview and execution
+-- FIX: Copy OPTIONS clause exactly from fullrun.sql
 
 
 -- ============================================================================

@@ -22,9 +22,21 @@ Workflows needs to perform a dry-run query before the actual execution of the wo
 
 For this, we need to create a `dryrun.sql` file that generates an empty table with the same schema as the actual component's result (defined in `fullrun.sql`) and returning 0 rows.
 
-> 💡 **Tip**
+> 🚨 **CRITICAL REQUIREMENT: Schema Must Match Exactly**
 >
-> The dry run code doesn't really need to be exactly the same as the full run. Functions that take longer to run can be avoided as long as the resulting schema is the same. For example, using `"uuid_string" AS uuid"` generates the same schema as `"GENERATE_UUID() AS uuid"` would generate.
+> **The dryrun.sql MUST produce EXACTLY the same output schema as fullrun.sql:**
+> - ✅ Same column names (case-sensitive)
+> - ✅ Same column types
+> - ✅ Same column order
+> - ✅ Same number of columns
+> - ✅ Zero rows (use `WHERE 1 = 0`)
+>
+> **The query implementation can differ** from fullrun.sql to optimize performance:
+> - Replace expensive functions with cheap literals of the same type (e.g., `"uuid_string"` instead of `GENERATE_UUID()`)
+> - Simplify computations while maintaining output types
+> - BUT: Always reference the same input tables and maintain the same SELECT structure
+>
+> **Golden Rule:** Generate exactly the same schema as the full run, as simply as possible.
 
 Below you can see an example of a stored procedure built following the approach defined above. This procedure takes a table and generates a new one that includes and additional column with a unique identifier.
 
@@ -49,6 +61,49 @@ Below you can see an example of a stored procedure built following the approach 
         FROM ''' || input || '''
         WHERE 1 = 0;
         ''';
+```
+
+### Common Dry Run Mistakes to Avoid
+
+❌ **WRONG: Query without FROM clause**
+```sql
+-- This generates a completely different schema!
+CREATE TABLE output AS
+SELECT "uuid_string" AS uuid
+WHERE 1 = 0;
+```
+
+❌ **WRONG: Different column names**
+```sql
+-- fullrun.sql creates 'uuid', dryrun.sql creates 'id' - SCHEMA MISMATCH!
+SELECT *, "uuid_string" AS id
+FROM input_table
+WHERE 1 = 0;
+```
+
+❌ **WRONG: Different column order**
+```sql
+-- fullrun.sql: SELECT col_a, col_b, new_col
+-- dryrun.sql: SELECT new_col, col_a, col_b  -- WRONG ORDER!
+```
+
+❌ **WRONG: Missing WHERE 1 = 0**
+```sql
+-- This will process all data, defeating the purpose of dry run!
+SELECT *, "uuid_string" AS uuid
+FROM input_table;
+```
+
+✅ **CORRECT: Same schema, optimized execution**
+```sql
+-- Matches fullrun.sql schema exactly:
+-- - Same SELECT * to preserve input columns
+-- - Same "AS uuid" column name
+-- - Same STRING type for uuid column
+-- - Adds WHERE 1 = 0 for zero rows
+SELECT *, "uuid_string" AS uuid
+FROM input_table
+WHERE 1 = 0;
 ```
 
 ## Variables

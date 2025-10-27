@@ -95,18 +95,31 @@ EXECUTE IMMEDIATE '''
     FROM ''' || input_table;
 ```
 
-### Dry Run Pattern
+### Dry Run Pattern (🚨 MUST MATCH FULLRUN SCHEMA EXACTLY)
 ```sql
 EXECUTE IMMEDIATE '''
     CREATE TABLE IF NOT EXISTS ''' || output_table || '''
     OPTIONS (expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 30 DAY))
     AS SELECT
-        *,
-        "literal" AS new_col            -- Use literal instead of function
-    FROM ''' || input_table || '''
-    WHERE 1 = 0;                        -- CRITICAL: Zero rows
+        *,                              -- SAME as fullrun: Preserve input columns
+        "literal" AS new_col            -- SAME column name/type as fullrun
+    FROM ''' || input_table || '''     -- SAME FROM clause as fullrun
+    WHERE 1 = 0;                        -- Add this: Zero rows
 ''';
 ```
+
+**🎯 GOLDEN RULE:** Dryrun schema must EXACTLY match fullrun schema:
+- ✅ Same column names (case-sensitive)
+- ✅ Same column types
+- ✅ Same column order
+- ✅ Same number of columns
+- ✅ Zero rows (WHERE 1 = 0)
+
+**❌ CRITICAL ERRORS TO AVOID:**
+- Query without FROM clause (missing input table columns!)
+- Different column names or order
+- Different data types
+- Missing WHERE 1 = 0
 
 ### FQN Detection
 ```sql
@@ -331,10 +344,15 @@ Need user input?
 ```
 Schema preview needed?
 ├─ Yes → Implement dryrun.sql
-│  ├─ Same columns as fullrun
-│  ├─ Same types as fullrun
-│  ├─ Use literals instead of functions
-│  └─ Add WHERE 1 = 0
+│  ├─ 🚨 CRITICAL: Schema must match fullrun EXACTLY
+│  ├─ Same column names (case-sensitive)
+│  ├─ Same column types
+│  ├─ Same column order
+│  ├─ Same number of columns
+│  ├─ Keep same FROM clause (don't omit input tables!)
+│  ├─ Keep same SELECT structure
+│  ├─ Optimize: Use literals instead of expensive functions (same type)
+│  └─ Must have: WHERE 1 = 0 (zero rows)
 └─ Actual execution?
    └─ Implement fullrun.sql
       ├─ Process data
