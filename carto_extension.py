@@ -1204,7 +1204,7 @@ def create_sql_code_sf(metadata):
             -- add to extensions table
 
             INSERT INTO {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
-            VALUES ('{metadata["name"]}', '{metadata_string}', '{procedures_string};{";".join(function_names) if function_names else ""}');
+            VALUES ('{metadata["name"]}', '{metadata_string}', '{procedures_string}{(";" + ";".join(function_names)) if function_names else ""}');
         END;"""
     )
 
