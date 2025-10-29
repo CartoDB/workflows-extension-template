@@ -62,6 +62,11 @@ This is the expected structure of the metadata file:
         "component_3",
         "component_4",
         ...
+    ],
+    "functions": [
+        "function_1",
+        "function_2",
+        ...
     ]
 }
 ```
@@ -73,3 +78,4 @@ Some important notes:
 * It's important to specify which data warehouse is compatible with your extension. For this, the `"provider"` property needs to be set to either `"bigquery"`, `"snowflake"`, or `"oracle"`.
 * Each element in the `details` array will be rendered in the extension's details page. Provide either a `link` or a `value` property. If both are provided, the `link` property will be rendered as a link and the `value` property will be ignored.
 * The `components` object must contain an array of all the components included in the extension.
+* The `functions` array is optional and contains a list of all User Defined Functions (UDFs) included in the extension. If no functions are included, this can be omitted or set to an empty array.

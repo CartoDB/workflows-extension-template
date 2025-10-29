@@ -87,6 +87,33 @@ You can also add an `env_vars` property, in case you need to pass test environme
         }
     }
 ]
+```
+
+#### Setup Tables
+
+You can also add a `setup_tables` property to define additional tables that should be created before running the test, but are not directly used as component inputs. This is useful when your component needs auxiliary tables or when testing with shared data across multiple tests.
+
+```json
+[
+    {
+        "id": 1,
+        "inputs": {
+            "input_table": "table1",
+            "value": "test"
+        },
+        "setup_tables": {
+            "reference_data": "reference",
+            "lookup_table": "lookup"
+        }
+    }
+]
+```
+
+In this example:
+- `reference_data` and `lookup_table` are the table names that will be created in the test database
+- `reference` and `lookup` are the corresponding NDJSON filenames (will look for `reference.ndjson` and `lookup.ndjson` in the test folder)
+- These tables will be available as `project.dataset.reference_data` and `project.dataset.lookup_table` in your SQL code (with clean names, no prefixes)
+- When referencing setup tables as input parameters, use the table name key (e.g., `"input_table": "reference_data"`)
 
 ```
 
@@ -152,8 +179,22 @@ From that point, you can now run the `test` script to run tests and check if the
 $ python carto_extension.py test
 ```
 
-## CI configuration
+## CI Configuration
 
 This template includes a GitHub workflow to run the extension test suite when new changes are pushed to the repository (provided that the `capture` script has been run and test fixtures have been captured).
 
-GitHub secrets must be configured in order to have the workflow correctly running. Check the [`.github/.workflow/CI_tests.yml`](../.github/.workflow/CI_tests.yml) file for more information.
+GitHub secrets must be configured in order to have the workflow correctly running. Check the [`.github/workflows/test.yml`](../.github/workflows/test.yml) file for more information.
+
+### Required Secrets
+
+For BigQuery testing:
+- `BQ_TEST_PROJECT`: BigQuery project for testing
+- `BQ_TEST_DATASET`: BigQuery dataset for testing
+- `GOOGLE_CREDENTIALS`: Service account credentials JSON
+
+For Snowflake testing:
+- `SF_ACCOUNT`: Snowflake account identifier
+- `SF_TEST_DATABASE`: Snowflake database for testing
+- `SF_TEST_SCHEMA`: Snowflake schema for testing
+- `SF_USER`: Snowflake username
+- `SF_PASSWORD`: Snowflake password
