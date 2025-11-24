@@ -347,11 +347,17 @@ def get_procedure_code_oracle(component):
     )
     with open(fullrun_file, "r") as f:
         fullrun_code = _strip_sql_comments(f.read()).replace("\n", "\n" + " " * 12)
+        # Oracle requires at least one statement - add NULL; if empty with proper indentation
+        if not fullrun_code.strip():
+            fullrun_code = "            NULL;"  # 12 spaces for proper indentation within IF block
     dryrun_file = os.path.join(
         components_folder, component["name"], "src", "dryrun.sql"
     )
     with open(dryrun_file, "r") as f:
         dryrun_code = _strip_sql_comments(f.read()).replace("\n", "\n" + " " * 12)
+        # Oracle requires at least one statement - add NULL; if empty with proper indentation
+        if not dryrun_code.strip():
+            dryrun_code = "            NULL;"  # 12 spaces for proper indentation within IF block
 
     comma_newline_and_tab = ",\n" + " " * 8
     newline_and_tab = "\n" + " " * 8
@@ -389,14 +395,14 @@ def get_procedure_code_oracle(component):
             ELSE
             {fullrun_code}
             END IF;
-        END {component["procedureName"]};
-        """
+        END {component["procedureName"]};"""
     )
 
     procedure_code = "\n".join(
         [line for line in procedure_code.split("\n") if line.strip()]
     )
-    return procedure_code
+    # Add / on its own line with no indentation
+    return procedure_code + "\n/"
 
 
 def create_sql_code_sf(metadata):
@@ -462,70 +468,79 @@ def create_sql_code_oracle(metadata):
     metadata_string = json.dumps(metadata).replace("'", "''")
     procedures_string = ';'.join(procedures)
 
-    code = dedent(
-        f"""BEGIN
-            -- Setup extension management table
-            DECLARE
-                v_procedures VARCHAR2(4000);
-                v_proc_name VARCHAR2(200);
-                v_pos NUMBER;
-                v_start NUMBER := 1;
+    # For Oracle, we generate setup code as a separate script
+    # Each block is separated by / for SQL*Plus execution
+    # IMPORTANT: The / must be on its own line with NO leading whitespace
+    setup_code = dedent(
+        f"""DECLARE
+            v_procedures VARCHAR2(4000);
+            v_proc_name VARCHAR2(200);
+            v_pos NUMBER;
+            v_start NUMBER := 1;
+        BEGIN
+            -- Create table if not exists
             BEGIN
-                -- Create table if not exists
-                BEGIN
-                    EXECUTE IMMEDIATE 'CREATE TABLE {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (
-                        name VARCHAR2(200),
-                        metadata CLOB,
-                        procedures VARCHAR2(4000)
-                    )';
-                EXCEPTION
-                    WHEN OTHERS THEN
-                        IF SQLCODE != -955 THEN -- Table already exists
-                            RAISE;
-                        END IF;
-                END;
-
-                -- Get procedures from previous installations
-                BEGIN
-                    EXECUTE IMMEDIATE 'SELECT procedures FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} WHERE name = ''{metadata["name"]}''' INTO v_procedures;
-
-                    -- Drop old procedures
-                    LOOP
-                        v_pos := INSTR(v_procedures, ';', v_start);
-                        IF v_pos = 0 THEN
-                            v_proc_name := SUBSTR(v_procedures, v_start);
-                        ELSE
-                            v_proc_name := SUBSTR(v_procedures, v_start, v_pos - v_start);
-                        END IF;
-
-                        IF v_proc_name IS NOT NULL THEN
-                            BEGIN
-                                EXECUTE IMMEDIATE 'DROP PROCEDURE {WORKFLOWS_TEMP_PLACEHOLDER}.' || v_proc_name;
-                            EXCEPTION
-                                WHEN OTHERS THEN NULL;
-                            END;
-                        END IF;
-
-                        EXIT WHEN v_pos = 0;
-                        v_start := v_pos + 1;
-                    END LOOP;
-                EXCEPTION
-                    WHEN NO_DATA_FOUND THEN
-                        NULL;
-                END;
-
-                -- Delete old extension metadata
-                EXECUTE IMMEDIATE 'DELETE FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} WHERE name = ''{metadata["name"]}''';
-
-                -- Insert new extension metadata
-                EXECUTE IMMEDIATE 'INSERT INTO {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures) VALUES (''{metadata["name"]}'', ''{metadata_string}'', ''{procedures_string}'')';
-
-                COMMIT;
+                EXECUTE IMMEDIATE 'CREATE TABLE {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (
+                    name VARCHAR2(200),
+                    metadata CLOB,
+                    procedures VARCHAR2(4000)
+                )';
+            EXCEPTION
+                WHEN OTHERS THEN
+                    IF SQLCODE != -955 THEN -- Table already exists
+                        RAISE;
+                    END IF;
             END;
-        END;|||
-        {procedures_code}
-        """
+
+            -- Get procedures from previous installations
+            BEGIN
+                SELECT procedures INTO v_procedures
+                FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
+                WHERE name = '{metadata["name"]}';
+
+                -- Drop old procedures
+                LOOP
+                    v_pos := INSTR(v_procedures, ';', v_start);
+                    IF v_pos = 0 THEN
+                        v_proc_name := SUBSTR(v_procedures, v_start);
+                    ELSE
+                        v_proc_name := SUBSTR(v_procedures, v_start, v_pos - v_start);
+                    END IF;
+
+                    IF v_proc_name IS NOT NULL AND LENGTH(TRIM(v_proc_name)) > 0 THEN
+                        BEGIN
+                            EXECUTE IMMEDIATE 'DROP PROCEDURE {WORKFLOWS_TEMP_PLACEHOLDER}.' || TRIM(v_proc_name);
+                        EXCEPTION
+                            WHEN OTHERS THEN
+                                IF SQLCODE != -4043 THEN
+                                    NULL;
+                                END IF;
+                        END;
+                    END IF;
+
+                    EXIT WHEN v_pos = 0;
+                    v_start := v_pos + 1;
+                END LOOP;
+            EXCEPTION
+                WHEN NO_DATA_FOUND THEN
+                    NULL;
+            END;
+
+            -- Delete old extension metadata
+            DELETE FROM {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME}
+            WHERE name = '{metadata["name"]}';
+
+            -- Insert new extension metadata
+            INSERT INTO {WORKFLOWS_TEMP_PLACEHOLDER}.{EXTENSIONS_TABLENAME} (name, metadata, procedures)
+            VALUES ('{metadata["name"]}', '{metadata_string}', '{procedures_string}');
+
+            COMMIT;
+        END;"""
     )
+
+    # Add a separator between blocks and append procedures
+    # The / must be on a line by itself with no indentation
+    code = setup_code + "\n/\n\n" + procedures_code
 
     return code
 
@@ -583,28 +598,65 @@ def deploy_oracle(metadata, destination):
         # Delete old extension if exists
         cursor.execute(f"DELETE FROM {destination}.{EXTENSIONS_TABLENAME} WHERE name = :name", {'name': metadata['name']})
 
-        # Insert new extension metadata
+        # Create procedures first (before inserting metadata)
+        created_procedures = []
+        for component in metadata["components"]:
+            procedure_code = get_procedure_code_oracle(component)
+            procedure_code = procedure_code.replace(WORKFLOWS_TEMP_PLACEHOLDER, destination)
+            procedure_code = substitute_vars(procedure_code)
+            # Strip the / separator as it's only needed for SQL*Plus scripts
+            procedure_code = procedure_code.rstrip().rstrip('/')
+            if verbose:
+                print(f"\nCreating procedure: {component['procedureName']}")
+                print(procedure_code)
+
+            try:
+                cursor.execute(procedure_code)
+                # Commit immediately so the procedure is visible for verification
+                or_client().commit()
+                created_procedures.append(component['procedureName'])
+                print(f"  ✓ Successfully created {component['procedureName']}")
+
+                # Verify the procedure was created (Oracle stores names in uppercase)
+                cursor.execute(
+                    "SELECT status FROM user_objects WHERE object_name = :name AND object_type = 'PROCEDURE'",
+                    {'name': component['procedureName'].upper()}
+                )
+                result = cursor.fetchone()
+                if result:
+                    if result[0] == 'VALID':
+                        print(f"  ✓ Procedure is VALID")
+                    else:
+                        print(f"  ⚠ Warning: Procedure status is {result[0]}")
+                        # Get compilation errors
+                        cursor.execute(
+                            "SELECT line, position, text FROM user_errors WHERE name = :name AND type = 'PROCEDURE' ORDER BY sequence",
+                            {'name': component['procedureName'].upper()}
+                        )
+                        errors = cursor.fetchall()
+                        if errors:
+                            print(f"  Compilation errors:")
+                            for err in errors:
+                                print(f"    Line {err[0]}, Pos {err[1]}: {err[2]}")
+                else:
+                    print(f"  ✗ Warning: Procedure not found after creation")
+            except Exception as e:
+                print(f"  ✗ Error creating procedure: {str(e)}")
+                raise
+
+        # Insert extension metadata only if procedures were created successfully
         metadata_string = json.dumps(metadata)
-        procedures_string = ';'.join([c["procedureName"] for c in metadata["components"]])
+        procedures_string = ';'.join(created_procedures)
         cursor.execute(
             f"INSERT INTO {destination}.{EXTENSIONS_TABLENAME} (name, metadata, procedures) VALUES (:name, :metadata, :procedures)",
             {'name': metadata['name'], 'metadata': metadata_string, 'procedures': procedures_string}
         )
 
-        # Create procedures
-        for component in metadata["components"]:
-            procedure_code = get_procedure_code_oracle(component)
-            procedure_code = procedure_code.replace(WORKFLOWS_TEMP_PLACEHOLDER, destination)
-            procedure_code = substitute_vars(procedure_code)
-            if verbose:
-                print(f"\nCreating procedure: {component['procedureName']}")
-                print(procedure_code)
-            cursor.execute(procedure_code)
-
         or_client().commit()
-        print("Extension correctly deployed to Oracle.")
+        print(f"\n✓ Extension correctly deployed to Oracle with {len(created_procedures)} procedure(s).")
     except Exception as e:
         or_client().rollback()
+        print(f"\n✗ Deployment failed: {str(e)}")
         raise e
     finally:
         cursor.close()
