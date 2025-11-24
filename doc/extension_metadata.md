@@ -1,5 +1,17 @@
+---
+title: Extension Metadata Reference
+description: Complete reference for the root metadata.json file that defines extension-level properties
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [icons.md]
+tags: [reference, metadata, extension, schema]
+see-also: [reference/extension-metadata-schema.json]
+---
+
 # Extension metadata
 Here you can find a reference of the different properties that must be contained in the metadata object of the extension.
+
+> **🤖 For AI Agents:** See [Extension Metadata Schema](./reference/extension-metadata-schema.json) for formal validation rules and [Validation Rules](./reference/validation-rules.md) for all constraints in tabular format.
 
 This is the expected structure of the metadata file:
 ```json
@@ -50,6 +62,11 @@ This is the expected structure of the metadata file:
         "component_3",
         "component_4",
         ...
+    ],
+    "functions": [
+        "function_1",
+        "function_2",
+        ...
     ]
 }
 ```
@@ -61,3 +78,4 @@ Some important notes:
 * It's important to specify which data warehouse is compatible with your extension. For this, the `"provider"` property needs to be set to either `"bigquery"`, `"snowflake"`, or `"oracle"`.
 * Each element in the `details` array will be rendered in the extension's details page. Provide either a `link` or a `value` property. If both are provided, the `link` property will be rendered as a link and the `value` property will be ignored.
 * The `components` object must contain an array of all the components included in the extension.
+* The `functions` array is optional and contains a list of all User Defined Functions (UDFs) included in the extension. If no functions are included, this can be omitted or set to an empty array.

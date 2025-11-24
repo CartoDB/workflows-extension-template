@@ -1,4 +1,15 @@
+---
+title: Anatomy of an Extension Package
+description: Complete overview of extension package structure, components, metadata, and testing
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [extension_metadata.md, component_metadata.md, procedure.md, icons.md, running_tests.md]
+tags: [architecture, overview, structure, reference]
+---
+
 # Anatomy of an Extension Package
+
+> **🤖 For AI Agents:** For a structured overview with file requirements and validation rules, see [Validation Rules - File Structure Requirements](./reference/validation-rules.md#file-structure-requirements).
 
 Each extension package contains a single file with **metadata** about the extension and one or more **components**.
 This is a simplified diagram of the folder structure of an extension package:
@@ -6,21 +17,30 @@ This is a simplified diagram of the folder structure of an extension package:
 ```
 extension-package/
 ├── metadata.json
-└── components/
-    ├── component_A/
-    │   ├── doc/
-    │   ├── test/
-    │   ├── src/
-    |   |   ├── dryrun.sql
-    │   │   └── fullrun.sql
-    │   └── metadata.json
-    └── component_B/
-        ├── doc/
-        ├── test/
-        ├── src/
-        |   ├── dryrun.sql
-        │   └── fullrun.sql
-        └── metadata.json
+├── components/
+│   ├── component_A/
+│   │   ├── doc/
+│   │   ├── test/
+│   │   ├── src/
+│   │   │   ├── dryrun.sql
+│   │   │   └── fullrun.sql
+│   │   └── metadata.json
+│   └── component_B/
+│       ├── doc/
+│       ├── test/
+│       ├── src/
+│       │   ├── dryrun.sql
+│       │   └── fullrun.sql
+│       └── metadata.json
+└── functions/
+    ├── function_A/
+    │   ├── metadata.json
+    │   └── src/
+    │       └── definition.sql
+    └── function_B/
+        ├── metadata.json
+        └── src/
+            └── definition.py
 ```
 
 ---
@@ -32,6 +52,20 @@ The extension's metadata file defines attributes like its name, the industry the
 Extension's metadata is defined in a [`metadata.json`](../metadata.json) file in the root folder of this repo.
 
 Find more information about the extension's metadata in the specific [documentation](./extension_metadata.md).
+
+---
+
+## Functions
+
+Extensions can include User Defined Functions (UDFs) that provide reusable functionality accessible from SQL queries and workflow components. Functions are defined in the [`/functions`](../functions/) directory.
+
+Each function has:
+- **Metadata**: Function signature, parameters, and return types
+- **Implementation**: SQL or Python code defining the function logic
+
+Functions support both SQL and Python implementations, with automatic dependency management for Python functions using PEP 723 metadata.
+
+Find complete documentation about creating and managing functions in the [UDF documentation](./user_defined_functions.md).
 
 ---
 

@@ -1,3 +1,13 @@
+---
+title: Component Metadata Reference
+description: Complete reference for component metadata.json including all input types, outputs, and configuration options
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [icons.md, procedure.md]
+tags: [reference, metadata, component, inputs, outputs, schema]
+see-also: [reference/component-metadata-schema.json, glossary.md]
+---
+
 # Component metadata
 
 Here you can find a reference of the different properties that must be contained in the metadata object of the component.
@@ -49,6 +59,8 @@ Some important notes about the metadata structure:
 * `inputs`: Array of input parameters the component accepts
 * `outputs`: Array of output parameters the component produces
 
+> **🤖 For AI Agents:** See [Component Metadata Schema](./reference/component-metadata-schema.json) for formal validation rules and [Validation Rules](./reference/validation-rules.md) for all constraints in tabular format.
+
 ## Inputs
 
 There are different types of inputs that can be used in the `inputs` array. 
@@ -86,13 +98,15 @@ Each input type has its own properties and will be rendered in the UI in a diffe
 ```
 
 #### Column
-**`Column`** is an input type that allows selecting a column from an input table specified as `parent`. The `dataType` property is used to specify the data type of the columns that will be listed in the UI.
+**`Column`** is an input type that allows selecting a column from an input table specified as `parent`. The `dataType` property is used to specify the data type of the columns that will be listed in the UI. 
+
+*Note that the `dataType` property uses the Workflow Engine Data Types listed below, not the native cloud data warehouse data types.*
 ```json
     {
         "name": "column",
         "title": "Column value",
         "parent": "input_table",
-        "dataType": ["string", "boolean", "geography"],
+        "dataType": ["string", "number", "boolean", "geography"],
         "type": "Column"
     }
 ```

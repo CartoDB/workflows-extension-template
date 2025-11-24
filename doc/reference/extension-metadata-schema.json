@@ -1,0 +1,183 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://carto.com/schemas/workflows-extension-metadata.json",
+  "title": "CARTO Workflows Extension Metadata",
+  "description": "Schema for the metadata.json file that defines a CARTO Workflows extension package",
+  "type": "object",
+  "required": [
+    "name",
+    "title",
+    "industry",
+    "description",
+    "icon",
+    "version",
+    "author",
+    "license",
+    "lastUpdate",
+    "provider",
+    "components"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique identifier for the extension (lowercase, no spaces)",
+      "pattern": "^[a-z0-9_]+$",
+      "examples": ["my_extension", "geospatial_tools"]
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable title displayed in the UI",
+      "minLength": 1,
+      "examples": ["My Extension", "Geospatial Tools"]
+    },
+    "industry": {
+      "type": "string",
+      "description": "Industry category for the extension",
+      "minLength": 1,
+      "examples": ["Retail", "Logistics", "Finance", "Telecommunications"]
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief explanation of what the extension provides",
+      "minLength": 1
+    },
+    "icon": {
+      "type": "string",
+      "description": "Filename of the SVG icon in the icons/ folder (80x80px, 8px safe area)",
+      "pattern": "^.+\\.svg$",
+      "examples": ["extension_icon.svg"]
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version number of the extension",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "examples": ["1.0.0", "2.1.3"]
+    },
+    "author": {
+      "type": "object",
+      "description": "Information about the extension author",
+      "required": ["value"],
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "Author name or organization",
+          "minLength": 1
+        },
+        "link": {
+          "type": "object",
+          "description": "Optional hyperlink for the author",
+          "required": ["label", "href"],
+          "properties": {
+            "label": {
+              "type": "string",
+              "description": "Display text for the link",
+              "minLength": 1
+            },
+            "href": {
+              "type": "string",
+              "format": "uri",
+              "description": "URL to author's website or profile"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "license": {
+      "type": "object",
+      "description": "License information for the extension",
+      "required": ["value"],
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "License name or identifier",
+          "minLength": 1,
+          "examples": ["MIT", "Apache 2.0", "Proprietary"]
+        },
+        "link": {
+          "type": "object",
+          "description": "Optional hyperlink to license text",
+          "required": ["label", "href"],
+          "properties": {
+            "label": {
+              "type": "string",
+              "description": "Display text for the link",
+              "minLength": 1
+            },
+            "href": {
+              "type": "string",
+              "format": "uri",
+              "description": "URL to license document"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "lastUpdate": {
+      "type": "string",
+      "description": "Date of last update in human-readable format",
+      "examples": ["Dec 21, 2024", "January 15, 2025"]
+    },
+    "provider": {
+      "type": "string",
+      "description": "Data warehouse provider this extension is compatible with",
+      "enum": ["bigquery", "snowflake", "oracle"],
+      "examples": ["bigquery"]
+    },
+    "details": {
+      "type": "array",
+      "description": "Optional additional details displayed on the extension page",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Detail field name",
+            "minLength": 1
+          },
+          "value": {
+            "type": "string",
+            "description": "Detail value (used if link not provided)",
+            "minLength": 1
+          },
+          "link": {
+            "type": "object",
+            "description": "Optional hyperlink (takes precedence over value if both provided)",
+            "required": ["label", "href"],
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Display text for the link",
+                "minLength": 1
+              },
+              "href": {
+                "type": "string",
+                "format": "uri",
+                "description": "URL for the detail"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "components": {
+      "type": "array",
+      "description": "List of component folder names included in this extension",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9_]+$",
+        "description": "Component folder name (must match a folder in /components/)"
+      },
+      "uniqueItems": true,
+      "examples": [["component_1", "component_2"]]
+    }
+  },
+  "additionalProperties": false
+}

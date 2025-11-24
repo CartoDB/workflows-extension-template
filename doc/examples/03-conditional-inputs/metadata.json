@@ -1,0 +1,195 @@
+{
+  "_comment": "This example demonstrates conditional input visibility using showIf",
+
+  "name": "conditional_inputs_demo",
+  "title": "Conditional Inputs Demo",
+  "description": "Demonstrates dynamic UI behavior where inputs appear/hide based on user selections",
+  "version": "1.0.0",
+  "icon": "component_icon.svg",
+  "cartoEnvVars": [],
+
+  "inputs": [
+    {
+      "name": "input_table",
+      "title": "Input table",
+      "type": "Table"
+    },
+    {
+      "_comment": "PRIMARY SELECTOR: This controls what other inputs are shown",
+      "name": "operation_type",
+      "title": "Operation type",
+      "description": "Select the type of operation to perform",
+      "type": "Selection",
+      "options": ["Filter", "Aggregate", "Transform"],
+      "default": "Filter"
+    },
+    {
+      "_comment": "CONDITIONAL INPUT 1: Only shown when operation_type is 'Filter'",
+      "name": "filter_column",
+      "title": "Filter column",
+      "description": "Column to filter on",
+      "parent": "input_table",
+      "dataType": ["string", "number", "boolean"],
+      "type": "Column",
+      "showIf": [
+        {
+          "parameter": "operation_type",
+          "value": "Filter"
+        }
+      ],
+      "helper": "This input only appears when 'Filter' is selected above"
+    },
+    {
+      "_comment": "CONDITIONAL INPUT 2: Only shown when operation_type is 'Filter'",
+      "name": "filter_value",
+      "title": "Filter value",
+      "description": "Value to filter for",
+      "type": "String",
+      "showIf": [
+        {
+          "parameter": "operation_type",
+          "value": "Filter"
+        }
+      ]
+    },
+    {
+      "_comment": "CONDITIONAL INPUT 3: Only shown when operation_type is 'Aggregate'",
+      "name": "group_by_column",
+      "title": "Group by column",
+      "description": "Column to group by",
+      "parent": "input_table",
+      "dataType": ["string"],
+      "type": "Column",
+      "showIf": [
+        {
+          "parameter": "operation_type",
+          "value": "Aggregate"
+        }
+      ],
+      "helper": "This input only appears when 'Aggregate' is selected"
+    },
+    {
+      "_comment": "CONDITIONAL INPUT 4: Only shown when operation_type is 'Aggregate'",
+      "name": "aggregation_function",
+      "title": "Aggregation function",
+      "description": "How to aggregate values",
+      "type": "Selection",
+      "options": ["sum", "avg", "count", "min", "max"],
+      "default": "sum",
+      "showIf": [
+        {
+          "parameter": "operation_type",
+          "value": "Aggregate"
+        }
+      ]
+    },
+    {
+      "_comment": "CONDITIONAL INPUT 5: Only shown when operation_type is 'Transform'",
+      "name": "transform_type",
+      "title": "Transform type",
+      "description": "Type of transformation to apply",
+      "type": "Selection",
+      "options": ["Uppercase", "Lowercase", "Title Case"],
+      "default": "Uppercase",
+      "showIf": [
+        {
+          "parameter": "operation_type",
+          "value": "Transform"
+        }
+      ]
+    },
+    {
+      "_comment": "SECONDARY SELECTOR: Creates a second level of conditional logic",
+      "name": "transform_column",
+      "title": "Transform column",
+      "description": "Column to transform",
+      "parent": "input_table",
+      "dataType": ["string"],
+      "type": "Column",
+      "showIf": [
+        {
+          "parameter": "operation_type",
+          "value": "Transform"
+        }
+      ]
+    },
+    {
+      "_comment": "NESTED CONDITIONAL: Only shown when Transform + specific transform_type",
+      "name": "preserve_special_chars",
+      "title": "Preserve special characters",
+      "description": "Keep special characters unchanged",
+      "type": "Boolean",
+      "default": true,
+      "showIf": [
+        {
+          "parameter": "operation_type",
+          "value": "Transform"
+        }
+      ],
+      "helper": "Nested conditions: appears only when Transform is selected"
+    },
+    {
+      "_comment": "ALWAYS VISIBLE: No showIf, so always displayed",
+      "name": "output_column_name",
+      "title": "Output column name",
+      "description": "Name for the new output column",
+      "type": "String",
+      "default": "result",
+      "helper": "This input is always visible regardless of selections above"
+    }
+  ],
+
+  "outputs": [
+    {
+      "name": "output_table",
+      "title": "Output table",
+      "type": "Table"
+    }
+  ],
+
+  "_showIf_patterns": {
+    "_comment": "Common patterns for conditional inputs",
+
+    "single_condition": {
+      "showIf": [
+        {
+          "parameter": "some_input",
+          "value": "specific_value"
+        }
+      ]
+    },
+
+    "multiple_conditions_AND": {
+      "_comment": "ALL conditions must be true (AND logic)",
+      "showIf": [
+        {
+          "parameter": "input1",
+          "value": "value1"
+        },
+        {
+          "parameter": "input2",
+          "value": "value2"
+        }
+      ]
+    },
+
+    "boolean_condition": {
+      "_comment": "Show when checkbox is checked",
+      "showIf": [
+        {
+          "parameter": "enable_advanced",
+          "value": true
+        }
+      ]
+    },
+
+    "cascading_visibility": {
+      "_comment": "Input A controls B, B controls C, etc.",
+      "input_a": "No showIf - always visible",
+      "input_b": "showIf input_a = 'X'",
+      "input_c": "showIf input_b = 'Y'"
+    }
+  },
+
+  "_implementation_note": "In fullrun.sql/dryrun.sql, all inputs are available as variables regardless of showIf. The showIf property only controls UI visibility. Your SQL should handle all possible combinations of input values."
+}

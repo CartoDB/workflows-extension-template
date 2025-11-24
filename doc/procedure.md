@@ -1,6 +1,20 @@
+---
+title: Writing Component Stored Procedures
+description: Guide to implementing component logic in fullrun.sql and dryrun.sql with SQL patterns and best practices
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [component_metadata.md]
+tags: [sql, stored-procedures, logic, implementation, patterns]
+see-also: [glossary.md]
+---
+
 # Writing the component procedure
 
 The component's logic should be implemented in the `fullrun.sql` and `dryrun.sql` files.
+
+> **💡 Example:** See the [annotated template files](../components/template/src/) for detailed pattern explanations with comments.
+>
+> **🤖 For AI Agents:** Check [Quick Reference](./reference/quick-reference.md) for SQL pattern snippets and [Validation Rules](./reference/validation-rules.md) for SQL constraints.
 
 ## Dry runs
 
@@ -8,9 +22,21 @@ Workflows needs to perform a dry-run query before the actual execution of the wo
 
 For this, we need to create a `dryrun.sql` file that generates an empty table with the same schema as the actual component's result (defined in `fullrun.sql`) and returning 0 rows.
 
-> 💡 **Tip**
+> 🚨 **CRITICAL REQUIREMENT: Schema Must Match Exactly**
 >
-> The dry run code doesn't really need to be exactly the same as the full run. Functions that take longer to run can be avoided as long as the resulting schema is the same. For example, using `"uuid_string" AS uuid"` generates the same schema as `"GENERATE_UUID() AS uuid"` would generate.
+> **The dryrun.sql MUST produce EXACTLY the same output schema as fullrun.sql:**
+> - ✅ Same column names (case-sensitive)
+> - ✅ Same column types
+> - ✅ Same column order
+> - ✅ Same number of columns
+> - ✅ Zero rows (use `WHERE 1 = 0`)
+>
+> **The query implementation can differ** from fullrun.sql to optimize performance:
+> - Replace expensive functions with cheap literals of the same type (e.g., `"uuid_string"` instead of `GENERATE_UUID()`)
+> - Simplify computations while maintaining output types
+> - BUT: Always reference the same input tables and maintain the same SELECT structure
+>
+> **Golden Rule:** Generate exactly the same schema as the full run, as simply as possible.
 
 Below you can see an example of a stored procedure built following the approach defined above. This procedure takes a table and generates a new one that includes and additional column with a unique identifier.
 
@@ -37,6 +63,49 @@ Below you can see an example of a stored procedure built following the approach 
         ''';
 ```
 
+### Common Dry Run Mistakes to Avoid
+
+❌ **WRONG: Query without FROM clause**
+```sql
+-- This generates a completely different schema!
+CREATE TABLE output AS
+SELECT "uuid_string" AS uuid
+WHERE 1 = 0;
+```
+
+❌ **WRONG: Different column names**
+```sql
+-- fullrun.sql creates 'uuid', dryrun.sql creates 'id' - SCHEMA MISMATCH!
+SELECT *, "uuid_string" AS id
+FROM input_table
+WHERE 1 = 0;
+```
+
+❌ **WRONG: Different column order**
+```sql
+-- fullrun.sql: SELECT col_a, col_b, new_col
+-- dryrun.sql: SELECT new_col, col_a, col_b  -- WRONG ORDER!
+```
+
+❌ **WRONG: Missing WHERE 1 = 0**
+```sql
+-- This will process all data, defeating the purpose of dry run!
+SELECT *, "uuid_string" AS uuid
+FROM input_table;
+```
+
+✅ **CORRECT: Same schema, optimized execution**
+```sql
+-- Matches fullrun.sql schema exactly:
+-- - Same SELECT * to preserve input columns
+-- - Same "AS uuid" column name
+-- - Same STRING type for uuid column
+-- - Adds WHERE 1 = 0 for zero rows
+SELECT *, "uuid_string" AS uuid
+FROM input_table
+WHERE 1 = 0;
+```
+
 ## Variables
 
 For implementing the logic of the component, you will have available a set of variable matching the names of the parameters declared in the `metadata.json` file, with both input and output parameters. These variables will contain the values selected by the user when configuring the component as part of a workflow.
@@ -47,17 +116,194 @@ The `input` and `output` variables will contain the names of the input table tha
 
 Do not generate tables with names others than the ones provided in the variables corresponding to output parameters. Otherwise, those tables will not be used when the component output is connected to another component in the workflow.
 
-## Replacing placeholders with environment variables
+## Referencing CARTO Analytics Toolbox
 
-You can use placeholders in your code as `@@variable_name@@`. Then you can define the environment variable `var_name` (or `VAR_NAME`) in your system variables or in an `.env` file in the repository folder, and the placeholder will be replaced when testing or deploying the application. This will work in the code, test configurations and test fixtures. This substitution is **not** performed when packaging the application - in that case it is delegated to CARTO on installation (for example, to substitute `@@analytics_toolbox_location@@` accordingly).
+If your component uses CARTO Analytics Toolbox functions, you need to choose the appropriate approach based on how your component is structured:
 
-When capturing test results, the inverse substitution will be performed so that all values present in the `.env` file will be subtitued with their respectives `@@variable_name` in the fixtures. Please takee into account that, while the aforementioned substitution can use all your environment variables, this reverse-substitution will only automatically apply those variables present in the `.env` file.
+### Approach 1: Using the @@analytics_toolbox_location@@ placeholder
+
+Use the `@@analytics_toolbox_location@@` placeholder directly in your stored procedure SQL:
+
+```sql
+CREATE OR REPLACE PROCEDURE component_procedure()
+BEGIN
+  SELECT @@analytics_toolbox_location@@.FUNCTION_NAME(geography_column)
+  FROM input_table;
+END;
+```
+
+**How it works:**
+- The placeholder `@@analytics_toolbox_location@@` is **replaced at extension installation time** in the Workflows UI
+- The FQN is **baked into the stored procedure definition** when the extension is installed
+- This substitution happens **once** when the user installs your extension
+- The placeholder is replaced with the connection-specific location (e.g., `carto-un.carto`)
+
+**When to use:**
+- When the Analytics Toolbox FQN needs to be part of the procedure definition itself
+- **Required for BigQuery** when function references are in the procedure body
+- **BigQuery only** - not available for other providers
+
+### Approach 2: Using cartoEnvVars
+
+Declare `analyticsToolboxDataset` in your component's `cartoEnvVars` array:
+
+```json
+{
+  "cartoEnvVars": ["analyticsToolboxDataset"],
+  ...
+}
+```
+
+Then use it as a variable in dynamic SQL:
+
+```sql
+EXECUTE IMMEDIATE '''
+SELECT ''' || analyticsToolboxDataset || '''.FUNCTION_NAME(geography_column)
+FROM ''' || input_table;
+```
+
+**How it works:**
+- The variable `analyticsToolboxDataset` is **evaluated at workflow execution time**
+- Workflows injects the correct value when building the SQL dynamically
+- The value can adapt if connection settings change
+
+**When to use:**
+- When building SQL dynamically with `EXECUTE IMMEDIATE`
+- Works across BigQuery, Snowflake, and Oracle
+- When you need flexibility for the location to change after installation
+
+### Key Differences
+
+| Aspect | Placeholder | cartoEnvVars |
+|--------|-------------|--------------|
+| **When evaluated** | At extension installation (static) | At workflow execution (dynamic) |
+| **Use case** | FQN in procedure definition | FQN in dynamic SQL |
+| **Flexibility** | Fixed at installation | Can change with connection settings |
+| **Availability** | **BigQuery only** | BigQuery, Snowflake, Oracle |
+| **Context** | Baked into stored procedure | Evaluated when building SQL |
+
+### For Local Testing
+
+When running `python carto_extension.py test` or `deploy` locally, you can define the placeholder in a `.env` file:
+
+```
+analytics_toolbox_location=carto-un.carto
+```
+
+This is purely for your development workflow and has no effect on how the extension works for end users who install it from CARTO UI.
 
 
-## Table names and API execution
+## Table Names and Execution Contexts
 
-When a workflow is run from the Workflows UI, table names of the tables created by its components are fully qualified. That means that, if your custom component is connected to an upstream components and uses a table from it, the name that it will received in the corresponding parameter will be a FQN (that is, in the form `project.dataset.table`). Output names received in the output parameters will also be FQNs.
+Your component will run in **two different execution contexts**, and table names are formatted differently in each:
 
-However, when the workflow is run as a stored procedure (when exported or when executed via API), all tables created in components are session tables that are single names (that is, something like `tablename` instead of `project.dataset.table`). That means that inputs that come from other components, and also output table names, will be single-name tables.
+### UI Execution Mode (Interactive)
 
-You should prepare your component to deal with this situation. Check the input/output table names to see whether they are fully-qualified or not, and implement the corresponding logic to run in each case.
+**When:** User runs a workflow from the Workflows UI
+
+**Table name format:** Fully Qualified Names (FQNs)
+- BigQuery: `project.dataset.table`
+- Snowflake: `DATABASE.SCHEMA.TABLE`
+
+**Example:**
+```sql
+-- input_table might contain:
+-- "my-project.my-dataset.input_data_abc123"
+
+-- output_table might contain:
+-- "my-project.my-dataset.output_result_xyz789"
+```
+
+**Why FQNs:**
+- Tables are created in persistent datasets/databases
+- Multiple users and workflows can run simultaneously
+- Each workflow run creates uniquely named tables
+- Tables persist for inspection and debugging
+
+### API Execution Mode (Programmatic)
+
+**When:** Workflow is executed via API or as an exported stored procedure
+
+**Table name format:** Session tables (simple names)
+- All providers: `tablename` (no project/dataset/database prefix)
+
+**Example:**
+```sql
+-- input_table might contain:
+-- "temp_input_1"
+
+-- output_table might contain:
+-- "temp_output_1"
+```
+
+**Why session tables:**
+- Tables only exist for the duration of the procedure execution
+- Simpler namespace management
+- Automatic cleanup when session ends
+- Faster execution (no persistent storage overhead)
+
+### Writing Compatible Components
+
+**Good news:** In most cases, you don't need special handling! The table reference syntax is identical for both FQN and session tables.
+
+**Example that works in both contexts:**
+```sql
+EXECUTE IMMEDIATE '''
+CREATE TABLE IF NOT EXISTS ''' || output_table || '''
+AS SELECT * FROM ''' || input_table || '''
+WHERE condition = true;
+''';
+```
+
+This works because:
+- If `input_table = "project.dataset.table1"` → `FROM project.dataset.table1` ✓
+- If `input_table = "table1"` → `FROM table1` ✓
+
+### When You Need Context Detection
+
+You only need to detect the execution context if your component logic needs to behave differently based on table persistence.
+
+**Detection pattern:**
+```sql
+-- Check if table name contains a dot (indicates FQN)
+DECLARE is_fqn BOOL;
+SET is_fqn = REGEXP_CONTAINS(input_table, r'\.');
+
+IF is_fqn THEN
+  -- UI execution: tables persist, can do post-processing
+  -- Example: Create indexes, analyze statistics, etc.
+ELSE
+  -- API execution: session tables, keep processing simple
+  -- Example: Skip optimization steps
+END IF;
+```
+
+### Important Considerations
+
+**Do:**
+- ✅ Use table name variables exactly as provided (`input_table`, `output_table`)
+- ✅ Assume either format could be passed
+- ✅ Use `EXECUTE IMMEDIATE` for dynamic table names
+- ✅ Test your component in both contexts
+
+**Don't:**
+- ❌ Hardcode table names
+- ❌ Assume tables will always be FQNs
+- ❌ Assume tables will always be session tables
+- ❌ Parse or modify table names unless absolutely necessary
+
+### Testing Both Contexts
+
+**UI context (during development):**
+```bash
+# Deploy creates actual tables with FQNs
+python carto_extension.py deploy --destination=myproject.mydataset
+```
+
+**API context (via tests):**
+```bash
+# Tests typically use session tables
+python carto_extension.py test
+```
+
+Both should work without code changes!

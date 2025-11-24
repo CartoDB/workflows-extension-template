@@ -1,5 +1,15 @@
-google-cloud-bigquery
-snowflake-connector-python
+google-cloud-bigquery[pandas]
+google-cloud-bigquery-storage
+snowflake-connector-python[secure-local-storage,pandas]
 oracledb
 python-dotenv
 shapely
+pytest
+pytest-unordered
+tqdm
+toml
+# Type stubs for better IDE support and linting
+pandas-stubs
+types-toml
+types-tqdm
+types-shapely

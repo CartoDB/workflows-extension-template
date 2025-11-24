@@ -1,4 +1,16 @@
+---
+title: Tooling Reference
+description: Reference for the carto_extension.py Python tool and its commands for building extensions
+version: 1.0.0
+last-updated: 2025-01-27
+depends-on: [running_tests.md]
+tags: [reference, tools, cli, commands, authentication]
+---
+
 # Tooling
+
+> **🤖 For AI Agents:** See [Quick Reference - CLI Commands](./reference/quick-reference.md#cli-commands) for a cheat sheet of all commands.
+
 This template comes with a Python tool that help with usual tasks when creating extension packages. 
 
 ## Authentication with the Data Warehouse
@@ -18,17 +30,17 @@ $ export SF_PASSWORD=my_snowflake_password
 For the `capture` and `test` commands, the authentication is managed in the `.env` file as explained [here](./running-tests.md#data-warehouse-configuration).
 
 ## Commands and parameters
-* `check`: Checks the extension code definition and metadata.
-* `capture`: Captures the output of the components to use as test fixtures.
+* `check`: Checks the extension code definition and metadata for both components and functions.
+* `capture`: Captures the output of components and functions to use as test fixtures.
   * `--component`: The component to capture.
   * `--verbose`: Show more information about the capture process.
-* `test`: Runs the tests for the components.
+* `test`: Runs the tests for components and functions using pytest framework.
   * `--component`: The component to test.
   * `--verbose`: Show more information about the test process.
-* `deploy`: Deploys the extension to the data warehouse.
+* `deploy`: Deploys the extension (components and functions) to the data warehouse.
   * `--destination`: The destination where the extension will be deployed in the data warehouse.
   * `--verbose`: Show more information about the deployment process.
-* `package`: Packages the extension into a zip file.
+* `package`: Packages the extension (including both components and functions) into a zip file.
   * `--verbose`: Show more information about the packaging process.
 
 
