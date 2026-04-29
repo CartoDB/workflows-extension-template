@@ -9,7 +9,7 @@ tags: [reference, tools, cli, commands, authentication]
 
 # Tooling
 
-> **🤖 For AI Agents:** See [Quick Reference - CLI Commands](./reference/quick-reference.md#cli-commands) for a cheat sheet of all commands.
+> **🤖 For AI Agents:** See [Quick Reference - CLI Commands](../.claude/skills/build-workflows-extension/references/quick-reference.md#cli-commands) for a cheat sheet of all commands.
 
 This template comes with a Python tool that help with usual tasks when creating extension packages. 
 
@@ -27,7 +27,7 @@ $ export SF_ACCOUNT=my_snowflake_account
 $ export SF_USER=my_snowflake_user
 $ export SF_PASSWORD=my_snowflake_password
 ```
-For the `capture` and `test` commands, the authentication is managed in the `.env` file as explained [here](./running-tests.md#data-warehouse-configuration).
+For the `capture` and `test` commands, the authentication is managed in the `.env` file as explained [here](./running_tests.md#data-warehouse-configuration).
 
 ## Commands and parameters
 * `check`: Checks the extension code definition and metadata for both components and functions.

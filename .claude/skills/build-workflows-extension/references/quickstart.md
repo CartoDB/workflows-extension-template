@@ -131,10 +131,10 @@ Your component:
 
 Now that you have a working component, explore:
 
-- **[Add more inputs](./component_metadata.md#inputs)** - Add parameters like strings, numbers, selections
-- **[Modify the logic](./procedure.md)** - Change what the component does
-- **[Add tests](./running_tests.md)** - Ensure your component works correctly
-- **[Package for distribution](./build_your_extension.md)** - Create a `.zip` file to share
+- **[Add more inputs](../../../../doc/component_metadata.md#inputs)** - Add parameters like strings, numbers, selections
+- **[Modify the logic](../../../../doc/procedure.md)** - Change what the component does
+- **[Add tests](../../../../doc/running_tests.md)** - Ensure your component works correctly
+- **[Package for distribution](../../../../doc/build_your_extension.md)** - Create a `.zip` file to share
 
 ## Authentication
 
@@ -164,7 +164,7 @@ export SF_PASSWORD=my_snowflake_password
 - Check data warehouse authentication
 
 **Validation errors in JSON**
-- Use schemas in `/doc/reference/` to validate your metadata files
+- Use the JSON schemas in `.claude/skills/build-workflows-extension/references/` to validate your metadata files
 - Ensure no trailing commas in JSON
 - Check that all required fields are present
 
@@ -209,7 +209,7 @@ These contain the fully-qualified table names (FQN) in UI mode, or session table
 
 ## Further Reading
 
-- **[Anatomy of an Extension](./anatomy_of_an_extension.md)** - Complete structure overview
-- **[Component Metadata Reference](./component_metadata.md)** - All input types and options
-- **[Writing Stored Procedures](./procedure.md)** - SQL patterns and best practices
-- **[JSON Schemas](./reference/)** - Validate your metadata files
+- **[Anatomy of an Extension](../../../../doc/anatomy_of_an_extension.md)** - Complete structure overview
+- **[Component Metadata Reference](../../../../doc/component_metadata.md)** - All input types and options
+- **[Writing Stored Procedures](../../../../doc/procedure.md)** - SQL patterns and best practices
+- **[JSON Schemas](./)** - Validate your metadata files (see `*-schema.json` siblings of this file)

@@ -5,13 +5,13 @@ version: 1.0.0
 last-updated: 2025-01-27
 depends-on: [icons.md]
 tags: [reference, metadata, extension, schema]
-see-also: [reference/extension-metadata-schema.json]
+see-also: [../.claude/skills/build-workflows-extension/references/extension-metadata-schema.json]
 ---
 
 # Extension metadata
 Here you can find a reference of the different properties that must be contained in the metadata object of the extension.
 
-> **🤖 For AI Agents:** See [Extension Metadata Schema](./reference/extension-metadata-schema.json) for formal validation rules and [Validation Rules](./reference/validation-rules.md) for all constraints in tabular format.
+> **🤖 For AI Agents:** See [Extension Metadata Schema](../.claude/skills/build-workflows-extension/references/extension-metadata-schema.json) for formal validation rules and [Validation Rules](../.claude/skills/build-workflows-extension/references/validation-rules.md) for all constraints in tabular format.
 
 This is the expected structure of the metadata file:
 ```json

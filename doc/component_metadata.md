@@ -5,7 +5,7 @@ version: 1.0.0
 last-updated: 2025-01-27
 depends-on: [icons.md, procedure.md]
 tags: [reference, metadata, component, inputs, outputs, schema]
-see-also: [reference/component-metadata-schema.json, glossary.md]
+see-also: [../.claude/skills/build-workflows-extension/references/component-metadata-schema.json, ../.claude/skills/build-workflows-extension/references/glossary.md]
 ---
 
 # Component metadata
@@ -59,7 +59,7 @@ Some important notes about the metadata structure:
 * `inputs`: Array of input parameters the component accepts
 * `outputs`: Array of output parameters the component produces
 
-> **🤖 For AI Agents:** See [Component Metadata Schema](./reference/component-metadata-schema.json) for formal validation rules and [Validation Rules](./reference/validation-rules.md) for all constraints in tabular format.
+> **🤖 For AI Agents:** See [Component Metadata Schema](../.claude/skills/build-workflows-extension/references/component-metadata-schema.json) for formal validation rules and [Validation Rules](../.claude/skills/build-workflows-extension/references/validation-rules.md) for all constraints in tabular format.
 
 ## Inputs
 
