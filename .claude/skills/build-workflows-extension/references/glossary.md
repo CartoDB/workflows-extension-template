@@ -93,7 +93,7 @@ The category of data an input accepts, determining its UI rendering and validati
 ## J
 
 ### JSON Schema
-A formal specification defining the structure and validation rules for JSON files. This repository provides schemas for extension and component metadata in `/doc/reference/`.
+A formal specification defining the structure and validation rules for JSON files. This repository provides schemas for extension and component metadata in `.claude/skills/build-workflows-extension/references/`.
 
 ## M
 
@@ -258,7 +258,7 @@ Complete list of available `cartoEnvVars`:
 
 ## See Also
 
-- [Component Metadata Reference](./component_metadata.md) - Detailed input type documentation
-- [Extension Metadata Reference](./extension_metadata.md) - Extension-level properties
-- [JSON Schemas](./reference/) - Formal validation schemas
+- [Component Metadata Reference](../../../../doc/component_metadata.md) - Detailed input type documentation
+- [Extension Metadata Reference](../../../../doc/extension_metadata.md) - Extension-level properties
+- [JSON Schemas](./) - Formal validation schemas (see `*-schema.json` siblings of this file)
 - [Quickstart Guide](./quickstart.md) - Get started quickly

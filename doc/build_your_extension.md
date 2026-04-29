@@ -5,16 +5,16 @@ version: 1.0.0
 last-updated: 2025-01-27
 depends-on: [anatomy_of_an_extension.md, component_metadata.md, procedure.md, icons.md, running_tests.md, tooling.md]
 tags: [tutorial, guide, getting-started, workflow]
-see-also: [quickstart.md]
+see-also: [../.claude/skills/build-workflows-extension/references/quickstart.md]
 ---
 
 ## Build your own extension
 
 ##### A step by step guide
 
-> **💡 Quick Start:** For a faster, minimal path to your first component, see the [Quickstart Guide](./quickstart.md) (5 minutes).
+> **💡 Quick Start:** For a faster, minimal path to your first component, see the [Quickstart Guide](../.claude/skills/build-workflows-extension/references/quickstart.md) (5 minutes).
 >
-> **🤖 For AI Agents:** See [Quick Reference](./reference/quick-reference.md) for commands and patterns, and [Examples](./examples/) for working code.
+> **🤖 For AI Agents:** This repo ships a Claude Code skill at `.claude/skills/build-workflows-extension/` that autoloads guidance. See also [Quick Reference](../.claude/skills/build-workflows-extension/references/quick-reference.md) for commands and patterns, and [Examples](../.claude/skills/build-workflows-extension/examples/) for working code.
 
 1. Create a new repository from this template. [See the oficial GitHub docs](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
 
@@ -30,7 +30,7 @@ see-also: [quickstart.md]
 
 5. Edit the component metadata file in `components/mycomponent/metadata.json`. For a complete reference of the available options, see [this page](./component_metadata.md).
 
-6. Edit the `components/mycomponent/src/fullrun.sql` and `components/mycomponent/src/dryrun.sql` files to define the logic of the new component. For a complete guide, see [here](./doc/procedure.md).
+6. Edit the `components/mycomponent/src/fullrun.sql` and `components/mycomponent/src/dryrun.sql` files to define the logic of the new component. For a complete guide, see [here](./procedure.md).
 
 > 💡 **Tip**
 >
@@ -53,7 +53,7 @@ see-also: [quickstart.md]
 
 > 💡 **Tip**
 >
-> At this point, it is highly recommended that you create and run some tests for your components, so that consistency on the results is easy to check across different versions. Check [this section](./running-tests.md) to learn more about creating and running tests for your components.
+> At this point, it is highly recommended that you create and run some tests for your components, so that consistency on the results is easy to check across different versions. Check [this section](./running_tests.md) to learn more about creating and running tests for your components.
 
 12. Use the `deploy` command to create the components and functions in a specific destination in your data warehouse. This is specially useful while developing, as it will avoid having to package and manually install the extension with every change.
 

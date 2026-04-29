@@ -364,8 +364,8 @@ Schema preview needed?
 
 ## See Also
 
-- [Glossary](../glossary.md) - All terms defined
+- [Glossary](./glossary.md) - All terms defined
 - [Validation Rules](./validation-rules.md) - Complete constraints
-- [Component Metadata](../component_metadata.md) - Detailed input types
+- [Component Metadata](../../../../doc/component_metadata.md) - Detailed input types
 - [Examples](../examples/) - Working code examples
-- [Quickstart](../quickstart.md) - 5-minute tutorial
+- [Quickstart](./quickstart.md) - 5-minute tutorial

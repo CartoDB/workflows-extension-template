@@ -5,7 +5,7 @@ version: 1.0.0
 last-updated: 2025-01-27
 depends-on: [component_metadata.md]
 tags: [sql, stored-procedures, logic, implementation, patterns]
-see-also: [glossary.md]
+see-also: [../.claude/skills/build-workflows-extension/references/glossary.md]
 ---
 
 # Writing the component procedure
@@ -14,7 +14,7 @@ The component's logic should be implemented in the `fullrun.sql` and `dryrun.sql
 
 > **💡 Example:** See the [annotated template files](../components/template/src/) for detailed pattern explanations with comments.
 >
-> **🤖 For AI Agents:** Check [Quick Reference](./reference/quick-reference.md) for SQL pattern snippets and [Validation Rules](./reference/validation-rules.md) for SQL constraints.
+> **🤖 For AI Agents:** Check [Quick Reference](../.claude/skills/build-workflows-extension/references/quick-reference.md) for SQL pattern snippets and [Validation Rules](../.claude/skills/build-workflows-extension/references/validation-rules.md) for SQL constraints.
 
 ## Dry runs
 

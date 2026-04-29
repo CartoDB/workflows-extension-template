@@ -53,29 +53,30 @@ Learn how to use the tools included with this template to help with the creation
 
 ### 🤖 For AI Agents
 
-Optimized documentation for programmatic consumption and rapid navigation:
+This repo ships a **Claude Code skill** at [`.claude/skills/build-workflows-extension/`](./.claude/skills/build-workflows-extension/SKILL.md) that autoloads when an agent is asked to build, modify, test, or package an extension. The skill is the single entry point — its `SKILL.md` walks the agent through the five-phase lifecycle (scaffold → metadata → SQL → tests → package/deploy) and points at deeper references on demand.
+
+Agent-targeted reference material has been moved into the skill folder:
 
 **Quick Start:**
-- [**Quickstart Guide**](./doc/quickstart.md) - Minimal 5-minute path to first component
-- [**Quick Reference**](./doc/reference/quick-reference.md) - One-page cheat sheet with patterns and commands
-- [**Glossary**](./doc/glossary.md) - All domain terms and definitions
+- [**Quickstart Guide**](./.claude/skills/build-workflows-extension/references/quickstart.md) - Minimal 5-minute path to first component
+- [**Quick Reference**](./.claude/skills/build-workflows-extension/references/quick-reference.md) - One-page cheat sheet with patterns and commands
+- [**Glossary**](./.claude/skills/build-workflows-extension/references/glossary.md) - All domain terms and definitions
 
 **Reference:**
-- [**Validation Rules**](./doc/reference/validation-rules.md) - Complete constraints in scannable tables
-- [**Extension Metadata Schema**](./doc/reference/extension-metadata-schema.json) - JSON Schema for validation
-- [**Component Metadata Schema**](./doc/reference/component-metadata-schema.json) - JSON Schema for validation
+- [**Validation Rules**](./.claude/skills/build-workflows-extension/references/validation-rules.md) - Complete constraints in scannable tables
+- [**Extension Metadata Schema**](./.claude/skills/build-workflows-extension/references/extension-metadata-schema.json) - JSON Schema for validation
+- [**Component Metadata Schema**](./.claude/skills/build-workflows-extension/references/component-metadata-schema.json) - JSON Schema for validation
 
 **Examples:**
-- [**Examples Index**](./doc/examples/README.md) - Working component examples with tests
-  - [Minimal Component](./doc/examples/01-minimal-component/) - Complete working example
-  - [Multi-Input Component](./doc/examples/02-multi-input-component/) - All input types
-  - [Conditional Inputs](./doc/examples/03-conditional-inputs/) - ShowIf patterns
+- [**Examples Index**](./.claude/skills/build-workflows-extension/examples/README.md) - Working component examples with tests
+  - [Minimal Component](./.claude/skills/build-workflows-extension/examples/01-minimal-component/) - Complete working example
+  - [Multi-Input Component](./.claude/skills/build-workflows-extension/examples/02-multi-input-component/) - All input types
+  - [Conditional Inputs](./.claude/skills/build-workflows-extension/examples/03-conditional-inputs/) - ShowIf patterns
 
 **Patterns:**
 - [**Template SQL (Annotated)**](./components/template/src/) - Heavily commented fullrun.sql and dryrun.sql explaining patterns
 
 **Navigation Tips for Agents:**
-- Check frontmatter `depends-on` for document dependencies
-- Use `tags` for topic-based navigation
-- Reference JSON Schemas for validation
-- Start with Quick Reference for fast lookups
+- Start at `SKILL.md` — it indexes everything else
+- Reference JSON Schemas for metadata validation
+- Use the Quick Reference for fast lookups during edits

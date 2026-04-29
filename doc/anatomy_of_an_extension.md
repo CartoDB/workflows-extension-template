@@ -9,7 +9,7 @@ tags: [architecture, overview, structure, reference]
 
 # Anatomy of an Extension Package
 
-> **🤖 For AI Agents:** For a structured overview with file requirements and validation rules, see [Validation Rules - File Structure Requirements](./reference/validation-rules.md#file-structure-requirements).
+> **🤖 For AI Agents:** This repo ships a Claude Code skill at `.claude/skills/build-workflows-extension/` that autoloads guidance. For a structured overview with file requirements and validation rules, see [Validation Rules - File Structure Requirements](../.claude/skills/build-workflows-extension/references/validation-rules.md#file-structure-requirements).
 
 Each extension package contains a single file with **metadata** about the extension and one or more **components**.
 This is a simplified diagram of the folder structure of an extension package:
@@ -103,7 +103,7 @@ Each component can also have its own set of tests to validate the results when r
 
 Tests are optional, but highly recommended.
 
-Learn more about how to run these tests in your data warehouse in [this document](./running-tests.md).
+Learn more about how to run these tests in your data warehouse in [this document](./running_tests.md).
 
 ---
 

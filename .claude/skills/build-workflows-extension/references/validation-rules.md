@@ -399,5 +399,5 @@ Valid values for `cartoEnvVars` array:
 
 - [Extension Metadata Schema](./extension-metadata-schema.json)
 - [Component Metadata Schema](./component-metadata-schema.json)
-- [Glossary](../glossary.md)
-- [Component Metadata Reference](../component_metadata.md)
+- [Glossary](./glossary.md)
+- [Component Metadata Reference](../../../../doc/component_metadata.md)

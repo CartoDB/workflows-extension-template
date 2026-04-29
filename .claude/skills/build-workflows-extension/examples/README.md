@@ -109,7 +109,7 @@ These examples are pedagogical - they're designed for learning, not for direct d
 
 ```bash
 # Copy to your extension's components folder
-cp -r doc/examples/01-minimal-component components/example_component
+cp -r .claude/skills/build-workflows-extension/examples/01-minimal-component components/example_component
 
 # Update your root metadata.json to include it
 # Add "example_component" to the components array
@@ -124,11 +124,11 @@ python carto_extension.py deploy --destination=yourproject.yourdataset
 
 ## Related Documentation
 
-- [Component Metadata Reference](../component_metadata.md) - Complete input type reference
-- [Writing Stored Procedures](../procedure.md) - SQL patterns and best practices
-- [Running Tests](../running_tests.md) - Testing guide
-- [Quickstart](../quickstart.md) - Build your first component in 5 minutes
-- [Validation Rules](../reference/validation-rules.md) - All constraints and rules
+- [Component Metadata Reference](../../../../doc/component_metadata.md) - Complete input type reference
+- [Writing Stored Procedures](../../../../doc/procedure.md) - SQL patterns and best practices
+- [Running Tests](../../../../doc/running_tests.md) - Testing guide
+- [Quickstart](../references/quickstart.md) - Build your first component in 5 minutes
+- [Validation Rules](../references/validation-rules.md) - All constraints and rules
 
 ---
 
